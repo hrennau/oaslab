@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oasModel version="3.1">
+    <OpenAPIObject>
+        <openapi type="string" required="yes"/>
+        <info type="InfoObject" required="yes"/>    
+        <jsonSchemaDialect type="string"/>
+        <servers type="ServerObject" array="yes"/>
+        <paths type="PathsObject"/>
+        <webhooks type="map-PathItemObject" keyName="webhookName"/>
+        <components type="ComponentsObject"/>
+        <security type="SecurityRequirementObject" array="yes"/>
+        <tags type="TagsObject" array="yes"/>
+        <externalDocs type="ExternalDocumentationObject"/>        
+    </OpenAPIObject>
+    
+    <InfoObject>
+        <title type="string" required="yes"/>
+        <summary type="string"/>
+        <description type="string"/>
+        <termsOfService type="string"/>
+        <contact type="ContactObject"/>
+        <license type="LicenseObject"/>
+        <version type="string" required="yes"/>
+    </InfoObject>
+    
+    <ContactObject>
+        <name type="string"/>
+        <url type="string"/>
+        <email type="string"/>
+    </ContactObject>
+    
+    <LicenseObject>
+        <name type="string" required="yes"/>
+        <identifier type="string"/>
+        <url type="string"/>
+    </LicenseObject>
+    
+    <ServerObject>
+        <url type="string" required="yes"/>
+        <description type="string"/>
+        <variables type="map-ServerVariableObject" keyName="varName"/>
+    </ServerObject>
+    
+    <ServerVariableObject>
+        <enum type="string" array="yes" nonempty="yes"/>
+        <default type="string" required="yes"/>
+        <description type="string"/>
+    </ServerVariableObject>
+    
+    <ComponentsObject>
+        <schemas type="map-SchemaObject" keyName="schemaName"/>
+        <responses type="ResponseObject"/>
+        <parameters type="map-ParameterObject" refAllowed="yes" keyName="parameterName"/>
+        <examples type="map-ExampleObject" refAllowed="yes" keyName="exampleName"/>
+        <requestBodies type="map-RequestBodyObject" refAllowed="yes" keyName="requestBodyName"/>
+        <headers type="map-HeaderObject" refAllowed="yes" keyName="headerName"/>
+        <securitySchemes type="map-SecuritySchemeObject" refAllowed="yes" keyName="schemeName"/>/>
+        <links type="map-LinkObject" refAllowed="yes" keyName="linkName"/>
+        <callbacks type="map-CallbackObject" refAllowed="yes" keyName="callbackName"/>
+        <pathItems type="map-PathItemObject" refAllowed="yes" keyName="path"/>
+    </ComponentsObject>
+    
+    <PathsObject>
+        <__path type="PathItemObject" refAllowed="yes" keySemantics="path"/>
+    </PathsObject>
+    
+    <PathItemObject>
+        <__ref type="ReferenceObject"/>
+        <summary type="string"/>
+        <description type="string"/>
+        <get type="OperationObject"/>
+        <put type="OperationObject"/>
+        <post type="OperationObject"/>
+        <delete type="OperationObject"/>
+        <options type="OperationObject"/>
+        <head type="OperationObject"/>
+        <patch type="OperationObject"/>
+        <trace type="OperationObject"/>
+        <servers type="ServerObject" array="yes"/>
+        <parameters type="ParameterObject" array="yes" refAllowed="yes"/>
+    </PathItemObject>
+    
+    <OperationObject>
+        <tags type="string" array="yes"/>
+        <summary type="string"/>
+        <description type="string"/>
+        <externalDocs type="ExternalDocumentationObject"/>
+        <operationId type="string" unique="yes"/>
+        <parameters type="ParameterObject" array="yes" refAllowed="yes"/>
+        <requestBody type="RequestBodyObject" refAllowed="yes"/>
+        <responses type="ResponsesObject"/>
+        <callbacks type="map-CallbackObject" refAllowed="yes" keyName="callbackObjectName"/>
+        <deprecated type="boolean"/>
+        <security type="SecurityRequirementObject" array="yes"/>
+        <servers type="ServerObject" array="yes"/>
+    </OperationObject>
+    
+    <ExternalDocumentationObject>
+        <description type="string"/>
+        <url type="string" required="yes"/>
+    </ExternalDocumentationObject>
+    
+    <ParameterObject>
+        <name type="string" required="yes"/>
+        <in type="string" enum="query header path cookie" required="yes"/>
+        <description type="string"/>
+        <required type="boolean"/>
+        <deprecated type="boolean"/>
+        <allowEmptyValue type="boolean" deprecated="yes"/>
+        <style type="string" enum="matrix label form simple spaceDelimited pipeDelimited deepObject"/>
+        <explode type="boolean"/>
+        <allowReserved type="boolean"/>
+        <schema type="SchemaObject" excludes="content" required="if-no-content"/>
+        <example type="any"/>
+        <examples type="map-ExampleObject" refAllowed="yes" keyName="exampleName"/>
+        <content type="map-MediaTypeObject" excludes="schema" keyName="mediatype" required="if-no-schema"/>
+    </ParameterObject>
+    
+    <RequestBodyObject>
+        <description type="string"/>
+        <content type="map-MediaTypeObject" required="yes" keyName="mediatype"/>
+        <required type="boolean"/>
+    </RequestBodyObject>
+    
+    <MediaTypeObject>
+        <schema type="SchemaObject"/>
+        <example type="any"/>
+        <examples type="map-ExampleObject" keyName="exampleName"/>
+        <encoding type="map-EncodingObject" keyName="propertyName"/>
+    </MediaTypeObject>
+    
+    <EncodingObject>
+        <contentType type="string"/>
+        <headers type="map-HeaderObject" refAllowed="yes" keyName="headerName"/>
+        <style type="string" enum="matrix label form simple spaceDelimited pepeDelimited deepObject"/>
+        <explode type="boolean"/>
+        <allowReserved type="boolean"/>
+    </EncodingObject>
+    
+    <ResponsesObject>
+        <default type="ResponseObject" refAllowed="yes"/>
+        <_httpStatusCode type="map-ResponseObject" keyName="httpStatusCode" refAllowed="yes"/>
+    </ResponsesObject>
+    
+    <ResponseObject>
+        <description type="string" required="yes"/>
+        <headers type="map-HeaderObject" refAllowed="yes" keyName="headerName"/>
+        <content type="map-MediaTypeObject" keyName="mediatype"/>
+        <links type="map-LinkObject" refAllowed="yes" keyName="linkName"/>
+    </ResponseObject>
+    
+    <CallbackObject>
+        <__expression type="PathItemObject" refAllowed="yes" nameSemantics="expression"/>
+    </CallbackObject>
+    
+    <ExampleObject>
+        <summary type="string"/>
+        <description type="string"/>
+        <value type="any" excludes="externalValue"/>
+        <externalValue type="uri" excludes="value"/>
+    </ExampleObject>
+    
+    <LinkObject>
+        <operationRef type="string"/>
+        <operationId type="string"/>
+        <parameters type="map-literalOrExpression" keyName="parameterName"/>
+        <requestBody type="any"/>
+        <description type="string"/>
+        <server type="ServerObject"/>
+    </LinkObject>
+
+    <HeaderObject note="= ParameterObject minus name minus in">
+        <description type="string"/>
+        <required type="boolean"/>
+        <deprecated type="boolean"/>
+        <allowEmptyValue type="boolean" deprecated="yes"/>
+        <style type="string" enum="matrix label form simple spaceDelimited pepeDelimited deepObject"/>
+        <explode type="boolean"/>
+        <allowReserved type="boolean"/>
+        <schema type="SchemaObject" required="yes"/>
+        <example type="any"/>
+        <examples type="map-ExampleObject" refAllowed="yes" keyName="exampleName"/>
+    </HeaderObject>
+    
+    <TagObject>
+        <name type="string"/>
+        <description type="string"/>
+        <externalDocs type="ExternalDocumentationObject"/>
+    </TagObject>
+    
+    <RefObject>
+        <__ref type="reference" required="yes"/>
+        <summary type="string"/>
+        <description type="string"/>
+    </RefObject>
+    
+    <SchemaObject note="plus all JSON Schema keywords">
+        <discriminator type="DiscriminatorObject"/>
+        <xml type="XMLObject"/>
+        <externalDocs type="ExternalDocumentationObject"/>
+        <example type="any" deprecated="yes"/>
+    </SchemaObject>
+    
+    <DiscriminatorObject>
+        <propertyName type="string"/>
+        <mapping type="map-string" keyName="propertyValue" mapValue="schemaNameOrRef"/>
+    </DiscriminatorObject>
+    
+    <XMLObject>
+        <name type="string"/>
+        <namespace type="string"/>
+        <prefix type="string"/>
+        <attribute type="boolean"/>
+        <wrapped type="boolean"/>
+    </XMLObject>
+    
+    <SecuritySchemeObject>
+        <type type="string" enum="apiKey http mutualTLS oauth2 openIdConnect" required="yes"/>
+        <description type="string"/>
+        <name type="string" required="yes"/>
+        <in type="string" enum="query header cookie" required="yes"/>
+        <scheme type="string" required="yes"/>
+        <bearerFormat type="string"/>
+        <flows type="OAuthFlowsObject" required="yes"/>
+        <openConnectUrl type="string" required="yes"/>
+    </SecuritySchemeObject>
+    
+    <OAuthFlowsObject>
+        <implicit type="OAuthFlowObject"/>
+        <password type="OAuthFLowObject"/>
+        <clienCredentials type="OAuthFlowObject"/>
+        <authorizationCode type="OAuthFlowObject"/>
+    </OAuthFlowsObject>
+    
+    <OAuthFlowObject>
+        <authorizationUrl type="string" required="yes"/>
+        <tokenUrl type="string" required="yes"/>
+        <refreshUrl type="string"/>
+        <scopes type="map-string" required="yes" keyName="scopeName" mapValue="scopeDescription"/>
+    </OAuthFlowObject>
+    
+    <SecurityRequirementObject>
+        <__name type="string" array="yes"/>
+    </SecurityRequirementObject>
+</oasModel>

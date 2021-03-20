@@ -1,0 +1,4 @@
+<toolSettings toolName="oaslab">
+  <namespace func="http://www.oaslab.org/ns/xquery-functions" error="http://www.oaslab.org/ns/error" struct="http://www.oaslab.org/ns/structure"/>
+  <flavor>basex79</flavor>
+</toolSettings>

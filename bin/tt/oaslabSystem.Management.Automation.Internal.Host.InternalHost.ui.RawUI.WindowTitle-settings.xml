@@ -1,0 +1,4 @@
+<toolSettings toolName="oaslabSystem.Management.Automation.Internal.Host.InternalHost.ui.RawUI.WindowTitle">
+  <namespace func="http://www.ttools.org/oaslabSystem.Management.Automation.Internal.Host.InternalHost.ui.RawUI.WindowTitle/ns/xquery-functions" error="http://www.ttools.org/oaslabSystem.Management.Automation.Internal.Host.InternalHost.ui.RawUI.WindowTitle/ns/error" struct="http://www.ttools.org/oaslabSystem.Management.Automation.Internal.Host.InternalHost.ui.RawUI.WindowTitle/ns/structure"/>
+  <flavor>xq30f</flavor>
+</toolSettings>

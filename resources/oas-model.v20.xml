@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oasModel>
+    <SchemaObject>
+        <swagger type="string" required="yes" fixed="2.0"/>
+        <info type="InfoObject" required="yes"/>    
+        <host type="string"/>
+        <basePath type="string"/>
+        <schemes type="string" array="yes" values="http https ws wss"/>
+        <consumes type="string" array="yes"/>
+        <produces type="string" array="yes"/>
+        <paths type="PathsObject"/>
+        <definitions type="DefinitionsObject"/>
+        <parameters type="ParametersDefinitionsObject"/>
+        <responses type="ResponsesDefinitionsObject"/>
+        <securityDefinitions type="SecurityDefinitionsObject"/>
+        <security type="SecurityRequirementObject" array="yes"/>
+        <tags type="TagsObject" array="yes"/>
+        <externalDocs type="ExternalDocumentationObject"/>        
+    </SchemaObject>
+    
+    <InfoObject>
+        <title type="string" required="yes"/>
+        <description type="string"/>
+        <termsOfService type="string"/>
+        <contact type="ContactObject"/>
+        <license type="LicenseObject"/>
+        <version type="string" required="yes"/>
+    </InfoObject>
+    
+    <ContactObject>
+        <name type="string"/>
+        <url type="string"/>
+        <email type="string"/>
+    </ContactObject>
+    
+    <LicenseObject>
+        <name type="string" required="yes"/>
+        <url type="string"/>
+    </LicenseObject>
+    
+    <PathsObject>
+        <__path type="PathItemObject" refAllowed="yes" keySemantics="path"/>
+    </PathsObject>
+    
+    <PathItemObject>
+        <__ref type="ReferenceObject"/>
+        <get type="OperationObject"/>
+        <put type="OperationObject"/>
+        <post type="OperationObject"/>
+        <delete type="OperationObject"/>
+        <options type="OperationObject"/>
+        <head type="OperationObject"/>
+        <patch type="OperationObject"/>
+        <parameters type="ParameterObject" array="yes" refAllowed="yes"/>
+    </PathItemObject>
+    
+    <OperationObject>
+        <tags type="string" array="yes"/>
+        <summary type="string"/>
+        <description type="string"/>
+        <externalDocs type="ExternalDocumentationObject"/>
+        <operationId type="string" unique="yes"/>
+        <consumes type="string" array="yes"/>
+        <produces type="string" array="yes"/>
+        <parameters type="ParameterObject" array="yes" refAllowed="yes"/>
+        <responses type="ResposesObject"/>
+        <schemes type="string" array="yes"/>
+        <deprecated type="boolean"/>
+        <security type="SecurityRequirementObject" array="yes"/>
+    </OperationObject>
+    
+    <ExternalDocumentationObject>
+        <description type="string"/>
+        <url type="string" required="yes"/>
+    </ExternalDocumentationObject>
+    
+    <ParameterObject>
+        <name type="string" required="yes"/>
+        <in type="string" values="query header path formData body" required="yes"/>
+        <description type="string"/>
+        <required type="boolean"/>
+        <deprecated type="boolean"/>
+        <schema type="SchemaObject" required="if-in-eq-body"/>        
+        <type type="string" required="if-in-ne-body" values="string number integer boolean array file"/>
+        <format type="string"/>
+        <allowEmptyValue type="boolean"/>
+        <items type="ItemsObject" required="if-type-eq-array"/>
+        <collectionFormat type="string" values="csv ssv tsv pipes multi" default="csv"/>
+        <default type="string"/>
+        <maximum type="number"/>
+        <exclusiveMaximum type="number"/>
+        <minimum type="number"/>
+        <exclusiveMinimum type="number"/>
+        <maxLength type="integer"/>
+        <minLength type="integer"/>
+        <pattern type="string"/>
+        <maxItems type="integer"/>
+        <minItems type="integer"/>
+        <uniqueItems type="boolean"/>
+        <enum type="string" array="yes"/>
+        <multipleOf type="number"/>
+    </ParameterObject>
+
+    <ItemsObject>
+        <type type="string" required="if-in-ne-body" values="string number integer boolean array"/>
+        <format type="string"/>
+        <collectionFormat type="string" values="csv ssv tsv pipes multi" default="csv"/>
+        <default type="string"/>
+        <maximum type="number"/>
+        <exclusiveMaximum type="number"/>
+        <minimum type="number"/>
+        <exclusiveMinimum type="number"/>
+        <maxLength type="integer"/>
+        <minLength type="integer"/>
+        <pattern type="string"/>
+        <maxItems type="integer"/>
+        <minItems type="integer"/>
+        <uniqueItems type="boolean"/>
+        <enum type="string" array="yes"/>
+        <multipleOf type="number"/>
+    </ItemsObject>
+    
+    <ResponsesObject>
+        <default type="ResponseObject" refAllowed="yes"/>
+        <__httpStatusCode type="ResponseObject" keySemantics="httpStatusCode" refAllowed="yes"/>
+    </ResponsesObject>
+    
+    <ResponseObject>
+        <description type="string" required="yes"/>
+        <schema type="SchemaObject"/>
+        <headers type="HeadersObject"/>
+        <examples type="ExampleObject"/>
+    </ResponseObject>
+    
+    <HeadersObject note="= ParameterObject minus name minus in">
+        <__name type="HeaderObject" keySemantics="headerName"/>
+    </HeadersObject>
+    
+    <HeaderObject>
+        <description type="string"/>
+        <type type="string" required="yes" values="string number integer boolean array file"/>
+        <format type="string"/>
+        <items type="ItemsObject" required="if-type-eq-array"/>
+        <collectionFormat type="string" values="csv ssv tsv pipes multi" default="csv"/>
+        <default type="string"/>
+        <maximum type="number"/>
+        <exclusiveMaximum type="number"/>
+        <minimum type="number"/>
+        <exclusiveMinimum type="number"/>
+        <maxLength type="integer"/>
+        <minLength type="integer"/>
+        <pattern type="string"/>
+        <maxItems type="integer"/>
+        <minItems type="integer"/>
+        <uniqueItems type="boolean"/>
+        <enum type="string" array="yes"/>
+        <multipleOf type="number"/>
+    </HeaderObject>
+    
+    <ExampleObject>
+        <__mimeType type="map-any" keySemantics="mime-type"/>
+    </ExampleObject>
+    
+    <TagObject>
+        <name type="string"/>
+        <description type="string"/>
+        <externalDocs type="ExternalDocumentationObject"/>
+    </TagObject>
+    
+    <RefObject>
+        <__ref type="reference" required="yes"/>
+    </RefObject>
+    
+    <SchemaObject note="plus all JSON Schema keywords">
+        <discriminator type="DiscriminatorObject"/>
+        <readOnly type="boolen"/>
+        <xml type="XMLObject"/>
+        <externalDocs type="ExternalDocumentationObject"/>
+        <example type="any" deprecated="yes"/>
+    </SchemaObject>
+    
+    <XMLObject>
+        <name type="string"/>
+        <namespace type="string"/>
+        <prefix type="string"/>
+        <attribute type="boolean"/>
+        <wrapped type="boolean"/>
+    </XMLObject>
+    
+    <DefinitionsObject>
+        <__name type="SchemaName" keySemantics="schemaName"/>
+    </DefinitionsObject>
+
+
+
+
+
+
+
+    <ServerObject>
+        <url type="string" required="yes"/>
+        <description type="string"/>
+        <variables type="map-ServerVariableObject"/>
+    </ServerObject>
+    
+    <ServerVariableObject>
+        <enum type="string" array="yes" nonempty="yes"/>
+        <default type="string" required="yes"/>
+        <description type="string"/>
+    </ServerVariableObject>
+    
+    <ComponentsObject>
+        <schemas type="map-SchemaObject" keySemantics="schemaName"/>
+        <responses type="map-ResponseObject" refAllowed="yes" keySemantics="responseName"/>
+        <parameters type="map-ParameterObject" refAllowed="yes" keySemantics="parameterName"/>
+        <examples type="map-ExampleObject" refAllowed="yes" keySemantica="exampleName"/>
+        <requestBodies type="map-RequestBodyObject" refAllowed="yes" keySementics="requestBodyName"/>
+        <headers type="map-HeaderObject" refAllowed="yes" keySementics="headerName"/>
+        <securitySchemes type="map-SecuritySchemeObject" refAllowed="yes" keySemantics="schemeName"/>/>
+        <links type="map-LinkObject" refAllowed="yes" keySemantics="linkName"/>
+        <callbacks type="map-CallbackObject" refAllowed="yes" keySemantics="callbackName"/>
+        <pathItems type="map-PathItemObject" refAllowed="yes" keySemantics="pathItemName"/>
+    </ComponentsObject>
+    
+    <RequestBodyObject>
+        <description type="string"/>
+        <content type="map-MediaTypeObject" required="yes"/>
+        <required type="boolean"/>
+    </RequestBodyObject>
+    
+    <MediaTypeObject>
+        <schema type="SchemaObject"/>
+        <example type="any"/>
+        <examples type="map-ExampleObject"/>
+        <encoding type="map-EncodingObject"/>
+    </MediaTypeObject>
+    
+    <EncodingObject>
+        <contentType type="string"/>
+        <headers type="map-HeaderObject" refAllowed="yes"/>
+        <style type="string" values="matrix label form simple spaceDelimited pepeDelimited deepObject"/>
+        <explode type="boolean"/>
+        <allowReserved type="boolean"/>
+    </EncodingObject>
+    
+    <CallbackObject>
+        <__expression type="PathItemObject" refAllowed="yes" nameSemantics="expression"/>
+    </CallbackObject>
+    
+    <LinkObject>
+        <operationRef type="string"/>
+        <operationId type="string"/>
+        <parameters type="map-literalOrExpression" keySemantics="parameterName"/>
+        <requestBody type="any"/>
+        <description type="string"/>
+        <server type="ServerObject"/>
+    </LinkObject>
+
+    <DiscriminatorObject>
+        <propertyName type="string"/>
+        <mapping type="map-string"/>
+    </DiscriminatorObject>
+    
+    <SecuritySchemeObject>
+        <type type="string" values="apiKey http mutualTLS oauth2 openIdConnect" required="yes"/>
+        <description type="string"/>
+        <name type="string" required="yes"/>
+        <in type="string" values="query header cookie" required="yes"/>
+        <schema type="string" required="yes"/>
+        <bearerFormat type="string"/>
+        <flows type="OAuthFlowsObject" required="yes"/>
+        <openConnectUrl type="string" required="yes"/>
+    </SecuritySchemeObject>
+    
+    <OAuthFlowsObject>
+        <implicit type="OAuthFlowObject"/>
+        <password type="OAuthFLowObject"/>
+        <clienCredentials type="OAuthFlowObject"/>
+        <authorizationCode type="OAuthFlowObject"/>
+    </OAuthFlowsObject>
+    
+    <OAuthFlowObject>
+        <authorizationUrl type="string" required="yes"/>
+        <tokenUrl type="string" required="yes"/>
+        <refreshUrl type="string"/>
+        <scopes type="map-string" required="yes" keySemantics="scope"/>
+    </OAuthFlowObject>
+    
+    <SecurityRequirementObject>
+        <__name type="string" array="yes"/>
+    </SecurityRequirementObject>
+</oasModel>
