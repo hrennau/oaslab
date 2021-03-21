@@ -13,6 +13,9 @@
          <param name="pathFilter" type="nameFilter?"/>
          <param name="operationFilter" type="nameFilter?"/>
          <param name="odir" type="xs:string?"/>
+         <param name="addSuffix" type="xs:string?"/>
+         <param name="addPrefix" type="xs:string?"/>
+         <param name="fnameReplacement" type="xs:string?"/>
       </operation>
     </operations>  
 :)  
@@ -31,32 +34,67 @@ at "navigation.xqm";
 declare namespace z="http://www.oaslab.org/ns/structure";
 
 (:~
- : Returns the path of the 'resources' folder.
+ : Implements the operation 'prune'. See function `pruneOAS` for details.
  :
- : @return an absolute path
+ : @param request the operation request with its input parameters
+ : @return pruned copies, either returned as strings, or written
+ :   into files
  :) 
 declare function f:pruneOP($request as element())
-        as item() {
+        as item()? {
     let $oas := tt:getParam($request, 'oas')/*
     let $pathFilter := tt:getParam($request, 'pathFilter')
     let $opFilter := tt:getParam($request, 'operationFilter')
     let $odir := tt:getParam($request, 'odir')
+    let $addSuffix := tt:getParam($request, 'addSuffix')
+    let $addPrefix := tt:getParam($request, 'addPrefix')
+    let $fnameReplacement := tt:getParam($request, 'fnameReplacement')
 
-    let $options := map{}
+    let $options := map:merge((
+        $addSuffix ! map:entry('addSuffix', .),
+        $addPrefix ! map:entry('addPrefix', .),
+        $addPrefix ! map:entry('fnameReplacement', .)        
+    ))
     return
-        f:pruneOAS($oas, $pathFilter, $opFilter, $odir)
+        f:pruneOAS($oas, $pathFilter, $opFilter, $odir, $options)
 };
 
+(:~
+ : Creates pruned copies of the input OpenAPI documents. Pruning 
+ : is by filtering Path Item Objects and/or Operation Objects, 
+ : and removing any named schemas not referenced in the pruned document.
+ :
+ : If $odir is specified, the pruned copies are written into files 
+ : in that folder, retaining their file name. Otherwise, they are 
+ : returned as strings.
+ :
+ : @param oas one or several OpenAPI documents, as XML node trees
+ : @param pathFilter a name filter for filtering Path Item Objects
+ :   by their path
+ : @param opFilter a name filter for filtering Operaions by their name
+ :   (get, post, put, ...)
+ : @return pruned copies, either returned as strings, or written
+ :   into files
+ :) 
 declare function f:pruneOAS($oas as element()+,
                             $pathFilter as element(nameFilter)?,
                             $opFilter as element(nameFilter)?,
+                            $odir as xs:string?,                            
                             $options as map(xs:string, item()*)?)
         as item()? {
         
     for $doc in $oas
     let $docEdited := f:pruneDocOAS($oas, $pathFilter, $opFilter)
+    let $jdoc := $docEdited ! util:jsonSerialize(.)
     return
-        $docEdited ! util:jsonSerialize(.)
+        if ($odir) then
+            let $sourceFileName := $doc/base-uri(.) ! file:name(.)
+            let $targetFileName := 
+                util:editFileName($sourceFileName, 
+                    $options?addPrefix, $options?addSuffix, $options?fnameReplacement)
+            let $targetPath := $odir || '/' || $targetFileName
+            return file:write($targetPath, $jdoc)
+        else $jdoc
 };
 
 (:~
@@ -75,9 +113,11 @@ declare function f:pruneDocOAS($oas as element(),
         as node()? {
     let $opElems :=
         if (empty($opFilter)) then () else nav:oasOperationObjects($oas)
-    let $prune1 := f:pruneDocOASRC($oas, $pathFilter, $opFilter, $opElems)
+    let $prune1 := f:prunePathsAndOperationsRC($oas, $pathFilter, $opFilter, $opElems)
     let $msgObjects := nav:oasMsgObjects($prune1)
-    let $requiredMsgObjects := $msgObjects/nav:requiredSchemas(.)/.
+    let $requiredMsgObjects := 
+        let $req := trace($msgObjects/nav:requiredSchemas(.)/. , '_REQUIRED_MSG_OBJECTS: ')
+        return if ($req) then $req else <DUMMY/> (: in order to avoid an empty value :)
     let $_WRITE := file:write('DEBUG_schemas', <result>{$msgObjects}</result>)
     let $_WRITE := file:write('DEBUG_schemas2', <result>{$msgObjects, $requiredMsgObjects}</result>)
     let $prune2 := f:removeNamedSchemas($prune1, $requiredMsgObjects, ())
@@ -87,14 +127,16 @@ declare function f:pruneDocOAS($oas as element(),
 (:~
  : Recursive helper function of `f:pruneDocOAS`.
  :)
-declare function f:pruneDocOASRC($n as node(),
-                                 $pathFilter as element(nameFilter)?,
-                                 $opFilter as element(nameFilter)?,
-                                 $opElems as element()*)
+declare function f:prunePathsAndOperationsRC(
+                                $n as node(),
+                                $pathFilter as element(nameFilter)?,
+                                $opFilter as element(nameFilter)?,
+                                $opElems as element()*)
         as node()? {
     typeswitch($n)
     case document-node() return 
-        document {$n/node() ! f:pruneDocOASRC(., $pathFilter, $opFilter, $opElems)}
+        document {$n/node() ! 
+            f:prunePathsAndOperationsRC(., $pathFilter, $opFilter, $opElems)}
     case element(paths) return
         if ($n/parent::json and not($n/../parent::*)) then
             $n/element {node-name(.)} {
@@ -102,38 +144,40 @@ declare function f:pruneDocOASRC($n as node(),
                 for $path in *
                 let $jname := $path/local-name(.) ! convert:decode-key(.)
                 where empty($pathFilter) or tt:matchesNameFilter($jname, $pathFilter)
-                return f:pruneDocOAS_copy($path, $pathFilter, $opFilter, $opElems)
+                return f:prunePathsAndOperations_copy($path, $pathFilter, $opFilter, $opElems)
             }        
-        else f:pruneDocOAS_copy($n, $pathFilter, $opFilter, $opElems)
+        else f:prunePathsAndOperations_copy($n, $pathFilter, $opFilter, $opElems)
     case element(get) | element(post) | element(put) | element(delete) |
          element(head) | element(options) | element(patch) | element(trace)
          return
             if ($n intersect $opElems and not(tt:matchesNameFilter($n/local-name(.), $opFilter))) then ()
-            else f:pruneDocOAS_copy($n, $pathFilter, $opFilter, $opElems)
+            else f:prunePathsAndOperations_copy($n, $pathFilter, $opFilter, $opElems)
          
     case element() return
-        f:pruneDocOAS_copy($n, $pathFilter, $opFilter, $opElems)
+        f:prunePathsAndOperations_copy($n, $pathFilter, $opFilter, $opElems)
     default return $n    
 };        
 
 (:~
- : Helper function of `f:pruneDocOAS`: maps an input element to
+ : Helper function of `f:prunePathsAndOperations`: maps an input element to
  : a recursively processed copy.
  :)
-declare function f:pruneDocOAS_copy(
+declare function f:prunePathsAndOperations_copy(
                                  $e as element(),
                                  $pathFilter as element(nameFilter)?,
                                  $opFilter as element(nameFilter)?,
                                  $opElems as element()*)
         as element() {
     $e/element {node-name(.)} {
-        @* ! f:pruneDocOASRC(., $pathFilter, $opFilter, $opElems),
-        node() ! f:pruneDocOASRC(., $pathFilter, $opFilter, $opElems)
+        @* ! f:prunePathsAndOperationsRC(., $pathFilter, $opFilter, $opElems),
+        node() ! f:prunePathsAndOperationsRC(., $pathFilter, $opFilter, $opElems)
     }
 };
 
 (:~
- : Remove named schemas.
+ : Remove named schemas. More precisely, only those named schemas re
+ : retained which are directly or indirectly referenced by the message 
+ : schemas retained after pruning.
  :)
 declare function f:removeNamedSchemas($oas as element(),
                                       $keepSchemas as element()*,
@@ -156,7 +200,9 @@ declare function f:removeNamedSchemasRC($n as node(),
         if (not($n/self::definitions/parent::json[not(parent::*)]) and
             not($n/self::schemas/parent::components/parent::json[not(parent::*)])) then 
             f:removeNamedSchemas_copy($n, $keepSchemas, $dropSchemas)
-        else            
+        else      
+            let $_DEBUG := trace('GOING TO PRUNE DEFINITIONS ...')
+            let $_DEBUG := trace(count($keepSchemas), '___#KEEP_SCHEMA: ')
             let $children := $n/*
             let $retain := $children
                 [not(. intersect $dropSchemas)]

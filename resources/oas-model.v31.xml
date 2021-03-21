@@ -138,7 +138,6 @@
     </EncodingObject>
     
     <ResponsesObject>
-        <default type="ResponseObject" refAllowed="yes"/>
         <_httpStatusCode type="map-ResponseObject" keyName="httpStatusCode" refAllowed="yes"/>
     </ResponsesObject>
     

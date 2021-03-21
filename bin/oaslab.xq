@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-03-20T18:37:13.757+01:00 
+ : @version 2021-03-21T12:38:30.991+01:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -86,6 +86,9 @@ declare variable $toolScheme :=
       <param name="pathFilter" type="nameFilter?"/>
       <param name="operationFilter" type="nameFilter?"/>
       <param name="odir" type="xs:string?"/>
+      <param name="addSuffix" type="xs:string?"/>
+      <param name="addPrefix" type="xs:string?"/>
+      <param name="fnameReplacement" type="xs:string?"/>
     </operation>
     <operation name="spec.keywords" type="node()" func="spec.objectsOP" mod="spec.xqm" namespace="http://www.oaslab.org/ns/xquery-functions">
       <param name="version" type="xs:string?" default="31" fct_values="20, 30, 31" pgroup="input"/>

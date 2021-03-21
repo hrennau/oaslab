@@ -62,7 +62,6 @@ declare function f:requiredSchemasRC($schemas as element()*,
         as element()* {
     if (empty($schemas)) then () else
     
-    let $_DEBUG := trace((), '_ENTER_RC ')
     let $head := head($schemas)
     let $tail := tail($schemas)
     return
@@ -70,7 +69,7 @@ declare function f:requiredSchemasRC($schemas as element()*,
             if ($tail) then f:requiredSchemasRC($tail, $visited)
             else $visited
         else
-            let $refs := trace($head//_0024ref/string() , '___REFS: ')
+            let $refs := $head//_0024ref/string()
             let $referenced := $refs ! foxf:resolveJsonRef(., $head, 'single')
             let $newTargets := $referenced except $visited
             let $newVisited := $visited

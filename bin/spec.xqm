@@ -113,16 +113,22 @@ declare function f:spec.objectsDeepRC($n as node(),
         for $child in $n/*
         let $childName := $child/local-name(.)
         let $isMapType := starts-with($child/@type, 'map-')
+        let $isWrappedMapType := $isMapType and not(starts-with($childName, '_'))
         let $mapKeyName := $child/@keyName/concat('_', .)
         let $typeName := $child/@type/replace(., '^map-', '')   
+        
+        (: Type name additions: [], {}, ! :)
         let $typeDisplayName := (
             if ($child/@array eq 'yes') then '['||$typeName||']' 
             else if ($isMapType) then '{'||$typeName||'}'
             else $typeName
             ) ! concat(., '!'[$child/@required eq 'yes'])
-        let $typeDef :=
-            let $typeDefName := $objectNames[. eq $typeName]
-            return $n/ancestor-or-self::*[last()]/*[local-name(.) eq $typeDefName]
+            
+        (: Type definition :)
+        let $typeDef := 
+            $n/ancestor-or-self::*[last()]/*[local-name(.) eq $typeName]
+            
+        (: Child content :)
         let $childContent := (
             attribute type {$typeDisplayName},
             $child/@enum,
@@ -136,17 +142,21 @@ declare function f:spec.objectsDeepRC($n as node(),
                     
             (: Recursive type definition - stop here :)
             else if ($typeDef intersect $visited) then attribute recursiveType {$typeDef/name()}
-                
+            
             (: A model-defined type :)
             else                     
-                let $typeContent := $typeDef/f:spec.objectsDeepRC(., $objectNames, ($visited, $n), $options)/*
+                let $typeContent := 
+                    $typeDef/f:spec.objectsDeepRC(., $objectNames, ($visited, $n), $options)/*
                 return
-                    if ($isMapType) then element {$mapKeyName} {$typeContent}
+                    (: Wrapped map type: content wrapped in map entry element (e.g. _httpStatusCode) :)
+                    if ($isWrappedMapType) then element {$mapKeyName} {$typeContent}
+                    
+                    (: Non-map type content :)
                     else $typeContent
         )
         return
-            if (starts-with($childName, '_') and $isMapType) then ($childContent)
-            else element {$childName} {$childContent}
+            (: No wrapping if the child is a map without wrapper element - see 'Responses Object' :)
+            element {$childName} {$childContent}
 
     let $contentAtts := $content/self::attribute()
     let $contentElems := $content except $contentAtts

@@ -17,6 +17,43 @@ at "tt/_foxpath-fox-functions.xqm";
 declare namespace z="http://www.oaslab.org/ns/structure";
 
 (:~
+ : Edits a file name. Input parameters may specify:
+ : - a prefix
+ : - a suffix (to be inserted before the file name extension, 
+ :    if there is one, and appended to the name, otherwise
+ : - a replacement, format "from=to"
+ :
+ : When editing, replacement is performed before adding
+ : prefix and suffix.
+ :
+ : @param fileName the file name to be edited
+ : @param prefix a prefix to be inserted
+ : @param suffix a suffix to be inserted (before the file name extension)
+ : @param a replacement of a substring by another substring; syntax:
+ :    from=to
+ : @return the edited file name
+ :)
+declare function f:editFileName($fileName as xs:string,
+                                $addPrefix as xs:string?,
+                                $addSuffix as xs:string?,
+                                $replacement as xs:string?)
+        as xs:string {
+    let $fname1 :=        
+        if (not($replacement)) then $fileName 
+        else
+            let $from := replace($replacement, '=.*', '')
+            let $to := replace($replacement, '^.*?=', '')
+            return replace($fileName, $from, $to, 'i')
+    let $fname2 := $addPrefix || $fname1
+    let $fname3 := 
+        if (not($addSuffix)) then $fname2
+        else
+           if (not(contains($fname2, '.'))) then $fname2 || $addSuffix
+           else replace($fname2, '\.[^.]*$', $addSuffix || '$0')
+    return $fname3
+};
+
+(:~
  : Returns the path of the 'resources' folder.
  :
  : @return an absolute path
