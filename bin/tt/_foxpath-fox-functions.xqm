@@ -92,6 +92,30 @@ declare function f:attNames($nodes as node()*,
         else $names
 };        
 
+(:~
+ : Writes a set of standard attributes. Can be useful when working
+ : with `xelement`.
+ :
+ : @param context the current context
+ : @param flags flags signaling which attributes are required
+ : @return the attributes
+ :)
+declare function f:atts($context as item(), $flags as xs:string)
+        as attribute()* {
+    if (contains($flags, 'b')) then
+        let $uri :=
+            if ($context instance of xs:anyAtomicType) then $context
+            else $context ! base-uri(.)
+        return
+            attribute xml:base {$uri},
+    if (contains($flags, 'j')) then
+        if (not($context instance of node())) then ()
+        else
+            let $jpath := f:namePath($context, 'jname', ())
+            return attribute jpath {$jpath}
+};
+
+
 declare function f:baseUriDirectory($item as item())
         as xs:string {
     (if ($item instance of node()) then $item else i:fox-doc($item, ()))
@@ -669,7 +693,7 @@ declare function f:nodesLocationReport($nodes as node()*,
         if ($withFolders) then f:baseUriDirectory(.) else (),
         f:baseUriFileName(.), 
         $fn_name(.), 
-        f:name-path(., 'jname', ()),
+        f:namePath(., 'jname', ()),
         .[self::attribute(), text()]/concat('value: ', .)
         ))
         => f:hlist(('Folder'[$withFolders], 'File', 'Name', 'Path', 'Value'), ())
@@ -906,17 +930,22 @@ declare function f:oasKeywordsRC($n as node(),
  : Returns the JSON Schema keywords found in OpenAPI document.
  :
  : @param oasNodes nodes from OpenAPI documents
- : @return the keywords contained by the OpenAPI documents
+ : @param names list of names or name patterns - return only matching keywords
+ : @param namesExclude list of names or name patterns - do not return matching 
+ :   keywords 
+ : @return keyword elements contained by the OpenAPI documents
  :)
 declare function f:oasJschemaKeywords($oasNodes as node()*,
                                       $names as xs:string?,
                                       $namesExcluded as xs:string?)
         as element()* {
-    let $oasNodes :=
-        $oasNodes ! (typeswitch(.) case document-node() return * default return ancestor-or-self::*[last()])
+    let $oasNodes := 
+        $oasNodes ! (
+          typeswitch(.) case document-node() return * 
+          default return ancestor-or-self::*[last()])
     return
     
-    $oasNodes/ancestor-or-self::*[last()]/(
+    $oasNodes/(
         definitions/*/*/f:jschemaKeywords(., $names, $namesExcluded),
         components/schemas/*/*/f:jschemaKeywords(., $names, $namesExcluded),
         f:oasMsgSchemas(.)/*/f:jschemaKeywords(., $names, $namesExcluded)
@@ -1150,7 +1179,27 @@ declare function f:write-json-docs($files as xs:string*,
  : @param atts attributes to be added
  : @return the constructed element
  :)
-declare function f:xelement($content as item()*,
+declare function f:xelement($name as xs:string, $content as item()*)
+        as element() {
+    let $atts := $content[. instance of attribute()]
+    let $nonatts := $content[not(. instance of attribute())]
+    return
+        element {$name} {
+            $atts,
+            $nonatts
+        }
+};      
+
+(:~
+ : Constructs an element with content given by $content. Each pair of items in $atts
+ : provides the name and value of an attribute to be added.
+ :
+ : @param content the element content
+ : @param name the element name
+ : @param atts attributes to be added
+ : @return the constructed element
+ :)
+declare function f:xelement_old($content as item()*,
                             $name as xs:string,
                             $atts as item()*)
         as element() {
@@ -1229,9 +1278,9 @@ declare function f:xwrap($items as item()*,
                 if (not(contains($flags, 'b'))) then () else
                     attribute xml:base {$item/base-uri(.)},
                 if (not(contains($flags, 'p'))) then () else
-                    attribute path {$item/f:name-path(., 'name', ())},
+                    attribute path {$item/f:namePath(., 'name', ())},
                 if (not(contains($flags, 'j'))) then () else
-                    attribute jpath {$item/f:name-path(., 'jname', ())}
+                    attribute jpath {$item/f:namePath(., 'jname', ())}
             )
             let $atts :=
                 if (empty($additionalAtts) or empty($item/@*)) then $item/@*
@@ -1486,8 +1535,11 @@ declare function f:descendant-names(
 };        
 
 (:~
- : Returns the parent name of a node. If $localNames is true, the local name is returned, 
- : otherwise the lexical names. 
+ : Copies a file to a target URI. The target URI may be a folder URI or a file URI.
+ :
+ : Options:
+ : overwrite ( or o) - copy overwrites existing file
+ : create (or c)     - if target folder does not exist, it is created 
  :
  : @param node a node
  : @param localName if true, the local name is returned, otherwise the lexical name
@@ -1615,6 +1667,8 @@ declare function f:leftValueOnly($leftValue as item()*,
  : in all other documents.
  :
  : @param docs a sequence of documents or document URIs
+ : @param counts a whitespace separated list of options;
+ :   count - do not display paths, only counts
  : @return a structured representation of data paths not used by all documents
  :)
 declare function f:pathCompare($items as item()*,
@@ -1634,13 +1688,13 @@ declare function f:pathCompare($items as item()*,
     
     let $pathArrays := 
         for $doc at $pos in $docs
-        let $paths := $doc/f:allDescendants(.)/f:name-path(., $nameKind, ()) => distinct-values() => sort()
+        let $paths := $doc/f:allDescendants(.)/f:namePath(., $nameKind, ()) => distinct-values() => sort()
         return array{$paths}
         
     let $commonPaths := util:atomIntersection($pathArrays)
     let $pathsMap := map:merge(
         for $doc at $pos in $docs
-        let $paths := $doc/f:allDescendants(.)/f:name-path(., $nameKind, ()) => distinct-values() => sort()
+        let $paths := $doc/f:allDescendants(.)/f:namePath(., $nameKind, ()) => distinct-values() => sort()
         return map:entry($pos, $paths)
     )
     let $deviations :=    
@@ -1747,9 +1801,9 @@ declare function f:pathContent($context as node()*,
  : @param localName if true, the local name is returned, otherwise the lexical name
  : @return the parent name
  :)
-declare function f:name-path($nodes as node()*, 
-                             $nameKind as xs:string?,   (: name | lname | jname :) 
-                             $numSteps as xs:integer?)
+declare function f:namePath($nodes as node()*, 
+                            $nameKind as xs:string?,   (: name | lname | jname :) 
+                            $numSteps as xs:integer?)
         as xs:string* {
     for $node in $nodes return
     
@@ -2077,23 +2131,55 @@ declare function f:resolveXsdTypeRefRC($refNs as xs:string,
 };        
 
 (:~
- : Resolves a JSON Schema allOf group.
+ : Resolves a JSON Schema allOf group. Returns all subschemas, with schema
+ : references recursively resolved and allOf subschemas recursively replaced
+ : by their subschemas.
  :
- : @param reference the reference string
- : @param oad the OpenAPI documents considered
- : @return the referenced schema object, or the empty string if no such object is found
+ : @param allOf a JSON Schema allOf keyword
+ : @return the subschemas, recursively resolved
  :)
-declare function f:resolveJsonAllOf($allOf as element(), 
-                                    $doc as element(json)+)
+declare function f:resolveJsonAllOf($allOf as element())
         as element()* {
     for $subschema in $allOf/_        
     return
         if ($subschema[_0024ref]) then 
             let $effective := f:jsonEffectiveValue($subschema)
             return
-                if ($effective/allOf) then $effective/allOf/f:resolveJsonAllOf(., $doc)
+                if ($effective/allOf) then $effective/allOf/f:resolveJsonAllOf(.)
                 else $effective
-        else if ($subschema/_allOf) then $subschema/allOf/f:resolveJsonAllOf(., $doc)
+        else if ($subschema/_allOf) then $subschema/allOf/f:resolveJsonAllOf(.)
+        else $subschema
+};
+
+(:~
+ : Resolves a JSON Schema anyOf group. Returns all subschemas, with schema
+ : references recursively resolved and anyOf subschemas recursively replaced
+ : by their subschemas.
+ :
+ : @param allOf a JSON Schema allOf keyword
+ : @return the subschemas, recursively resolved
+ :)
+declare function f:resolveJsonAnyOf($anyOf as element())
+        as element()* {
+    for $subschema in $anyOf/_/f:jsonEffectiveValue(.)        
+    return
+        if ($subschema/_anyOf) then $subschema/anyOf/f:resolveJsonAnyOf(.)
+        else $subschema
+};
+
+(:~
+ : Resolves a JSON Schema oneOf group. Returns all subschemas, with schema
+ : references recursively resolved and oneOf subschemas recursively replaced
+ : by their subschemas.
+ :
+ : @param oneOf a JSON Schema oneOf keyword
+ : @return the subschemas, recursively resolved
+ :)
+declare function f:resolveJsonOneOf($oneOf as element())
+        as element()* {
+    for $subschema in $oneOf/_/f:jsonEffectiveValue(.)
+    return
+        if ($subschema/_oneOf) then $subschema/oneOf/f:resolveJsonOneOf(.)
         else $subschema
 };
 

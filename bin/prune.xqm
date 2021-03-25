@@ -84,7 +84,7 @@ declare function f:pruneOAS($oas as element()+,
         as item()? {
         
     for $doc in $oas
-    let $docEdited := f:pruneDocOAS($oas, $pathFilter, $opFilter)
+    let $docEdited := f:pruneDocOAS($doc, $pathFilter, $opFilter)
     let $jdoc := $docEdited ! util:jsonSerialize(.)
     return
         if ($odir) then
@@ -115,9 +115,11 @@ declare function f:pruneDocOAS($oas as element(),
         if (empty($opFilter)) then () else nav:oasOperationObjects($oas)
     let $prune1 := f:prunePathsAndOperationsRC($oas, $pathFilter, $opFilter, $opElems)
     let $msgObjects := nav:oasMsgObjects($prune1)
+    let $_DEBUG := trace('PRUNE1 done') 
     let $requiredMsgObjects := 
         let $req := trace($msgObjects/nav:requiredSchemas(.)/. , '_REQUIRED_MSG_OBJECTS: ')
         return if ($req) then $req else <DUMMY/> (: in order to avoid an empty value :)
+    let $_DEBUG := trace(count($requiredMsgObjects), '#REQ_MSG_OBJECTS: ')        
     let $_WRITE := file:write('DEBUG_schemas', <result>{$msgObjects}</result>)
     let $_WRITE := file:write('DEBUG_schemas2', <result>{$msgObjects, $requiredMsgObjects}</result>)
     let $prune2 := f:removeNamedSchemas($prune1, $requiredMsgObjects, ())
@@ -142,7 +144,7 @@ declare function f:prunePathsAndOperationsRC(
             $n/element {node-name(.)} {
                 @*,
                 for $path in *
-                let $jname := $path/local-name(.) ! convert:decode-key(.)
+                let $jname := trace( $path/local-name(.) ! convert:decode-key(.) , '___JNAME: ')
                 where empty($pathFilter) or tt:matchesNameFilter($jname, $pathFilter)
                 return f:prunePathsAndOperations_copy($path, $pathFilter, $opFilter, $opElems)
             }        

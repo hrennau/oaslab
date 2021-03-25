@@ -17,6 +17,68 @@ at "tt/_foxpath-fox-functions.xqm";
 declare namespace z="http://www.oaslab.org/ns/structure";
 
 (:~
+ : Returns the JSON name of a node.
+ :
+ : @param node a node
+ : @return the original JSON name of the node
+ :)
+declare function f:jname($node as node())
+        as xs:string {
+    $node/local-name(.) ! convert:decode-key(.)            
+};
+
+(:~
+ : Writes a document into a file. The document is not necessarily
+ : an XML node tree. 
+ :
+ : Parameter $sourceFileNameSource specifies a source file name
+ : which is either retained or edited according to other parameters
+ : taken from the options (addPrefix, addSuffix, fnameReplacement).
+ : If the value is a string, it is treated as a file name or a URI
+ : from which the file name is extracted. If the value is a node, 
+ : the source file name is derived from the base URI of the node.
+ :
+ : When $sourceFileNameSource is not provided, the document must
+ : be an XML node tree and the source file name is derived from 
+ : its base URI. 
+ :
+ : Options:
+ : odir - target folder (mandatory!)
+ : addPrefix - a prefix to be added to the source file name
+ : addSuffix - a suffix to be inserted before the file name
+ :     extension
+ : fnameReplacement - describes a string replacement to be
+ :     applied to the source file name; syntax: fromSubstring=toSubstring
+ :  
+ : @param doc the document to be written
+ : @param sourceFileNameSource explicit specification of the source file 
+ :     name either to be retained to edited
+ : @param options Options controlling the target file location.
+ : @return empty sequence
+ :)
+declare function f:writeFile($doc as item(),
+                             $sourceFileNameSource as item()?,
+                             $options as map(*))
+        as empty-sequence() {
+    let $odir := $options?odir
+    return if (not($odir)) then () else
+
+    let $sourceFileName := 
+        if ($sourceFileNameSource) then
+            if ($sourceFileNameSource instance of node()) then $sourceFileNameSource/base-uri(.) ! file:name(.)
+            else $sourceFileNameSource ! file:name(.)
+        else if ($doc instance of node()) then 
+            $doc/base-uri(.) ! file:name(.)
+        else 
+            error(QName((), 'INVALID_CALL'), "Non-node document requires explicit $sourceFilenName.")
+    let $targetFileName := 
+        f:editFileName($sourceFileName, 
+                       $options?addPrefix, $options?addSuffix, $options?fnameReplacement)
+    let $targetPath := $odir || '/' || $targetFileName
+    return file:write($targetPath, $doc)
+};
+
+(:~
  : Edits a file name. Input parameters may specify:
  : - a prefix
  : - a suffix (to be inserted before the file name extension, 
@@ -38,7 +100,7 @@ declare function f:editFileName($fileName as xs:string,
                                 $addSuffix as xs:string?,
                                 $replacement as xs:string?)
         as xs:string {
-    let $fname1 :=        
+    let $fname1 :=      
         if (not($replacement)) then $fileName 
         else
             let $from := replace($replacement, '=.*', '')
@@ -101,7 +163,22 @@ declare function f:jsonSerialize($doc as element())
         if ($doc/@xml:*) then
             $doc/element {node-name($doc)} {@* except @xml:*, node()}
         else $doc
-    let $ser := json:serialize($useDoc, map{})
+    (: let $ser := json:serialize($useDoc, map{}) :)
+    let $ser := serialize($useDoc, map{'method': 'json', 'use-character-maps': map{'/':'/'}})
     return $ser
 };   
+
+(:~
+ : Reorders a sequence of nodes so that attributs precede
+ : any other nodes.
+ :
+ : @param nodes nodes to be reordered
+ : @return reordered nodes
+ :)
+declare function f:attsElems($nodes as node()*)
+        as node()* {
+    let $atts := $nodes[self::attribute()]        
+    return ($atts, $nodes except $atts)
+};        
+        
         

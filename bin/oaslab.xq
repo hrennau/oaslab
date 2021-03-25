@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-03-21T12:38:30.991+01:00 
+ : @version 2021-03-25T18:13:58.274+01:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -10,11 +10,20 @@ import module namespace tt="http://www.ttools.org/xquery-functions" at
     "tt/_pcollection.xqm",
     "tt/_request.xqm";
 
-import module namespace a2="http://www.oaslab.org/ns/xquery-functions" at
+import module namespace a5="http://www.oaslab.org/ns/xquery-functions" at
     "spec.xqm";
 
-import module namespace a1="http://www.oaslab.org/ns/xquery-functions/prune" at
+import module namespace a4="http://www.oaslab.org/ns/xquery-functions/jtree" at
+    "schemaGroup.xqm";
+
+import module namespace a1="http://www.oaslab.org/ns/xquery-functions/mtree" at
+    "mtree.xqm";
+
+import module namespace a2="http://www.oaslab.org/ns/xquery-functions/prune" at
     "prune.xqm";
+
+import module namespace a3="http://www.oaslab.org/ns/xquery-functions/ref" at
+    "ref.xqm";
 
 declare namespace m="http://www.oaslab.org/ns/xquery-functions";
 declare namespace z="http://www.oaslab.org/ns/structure";
@@ -81,10 +90,45 @@ declare variable $toolScheme :=
     <operation name="_nodlSample" type="node()" func="nodlSample" mod="tt/_pcollection.xqm" namespace="http://www.ttools.org/xquery-functions">
       <param name="model" type="xs:string?" fct_values="xml, sql, mongo" default="xml"/>
     </operation>
+    <operation name="mtree" type="item()?" func="mtreeOP" mod="mtree.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/mtree">
+      <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
+      <param name="flat" type="xs:boolean?" default="false"/>
+      <param name="bare" type="xs:boolean?"/>
+      <param name="pathFilter" type="nameFilter?"/>
+      <param name="methodFilter" type="nameFilter?"/>
+      <param name="roleFilter" type="nameFilter?"/>
+      <param name="odir" type="xs:string?"/>
+      <param name="addSuffix" type="xs:string?"/>
+      <param name="addPrefix" type="xs:string?"/>
+      <param name="fnameReplacement" type="xs:string?"/>
+    </operation>
+    <operation name="stree" type="item()?" func="streeOP" mod="mtree.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/mtree">
+      <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
+      <param name="flat" type="xs:boolean?" default="false"/>
+      <param name="bare" type="xs:boolean?"/>
+      <param name="nameFilter" type="nameFilter?"/>
+      <param name="odir" type="xs:string?"/>
+      <param name="addSuffix" type="xs:string?"/>
+      <param name="addPrefix" type="xs:string?"/>
+      <param name="fnameReplacement" type="xs:string?"/>
+    </operation>
     <operation name="prune" type="item()?" func="pruneOP" mod="prune.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/prune">
       <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
       <param name="pathFilter" type="nameFilter?"/>
       <param name="operationFilter" type="nameFilter?"/>
+      <param name="odir" type="xs:string?"/>
+      <param name="addSuffix" type="xs:string?"/>
+      <param name="addPrefix" type="xs:string?"/>
+      <param name="fnameReplacement" type="xs:string?"/>
+    </operation>
+    <operation name="jsref" type="item()?" func="jsrefOP" mod="ref.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/ref">
+      <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
+      <param name="odir" type="xs:string?"/>
+    </operation>
+    <operation name="group" type="item()?" func="groupOP" mod="schemaGroup.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/jtree">
+      <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
+      <param name="skipWithSingleChild" type="xs:boolean?" default="false"/>
+      <param name="groupKind" type="xs:string*" fct_values="allOf, oneOf, anyOf"/>
       <param name="odir" type="xs:string?"/>
       <param name="addSuffix" type="xs:string?"/>
       <param name="addPrefix" type="xs:string?"/>
@@ -245,6 +289,28 @@ declare function m:execOperation__nodlSample($request as element())
 };
      
 (:~
+ : Executes operation 'mtree'.
+ :
+ : @param request the request element
+ : @return the operation result
+ :)
+declare function m:execOperation_mtree($request as element())
+        as item()? {
+    a1:mtreeOP($request)        
+};
+     
+(:~
+ : Executes operation 'stree'.
+ :
+ : @param request the request element
+ : @return the operation result
+ :)
+declare function m:execOperation_stree($request as element())
+        as item()? {
+    a1:streeOP($request)        
+};
+     
+(:~
  : Executes operation 'prune'.
  :
  : @param request the request element
@@ -252,7 +318,29 @@ declare function m:execOperation__nodlSample($request as element())
  :)
 declare function m:execOperation_prune($request as element())
         as item()? {
-    a1:pruneOP($request)        
+    a2:pruneOP($request)        
+};
+     
+(:~
+ : Executes operation 'jsref'.
+ :
+ : @param request the request element
+ : @return the operation result
+ :)
+declare function m:execOperation_jsref($request as element())
+        as item()? {
+    a3:jsrefOP($request)        
+};
+     
+(:~
+ : Executes operation 'group'.
+ :
+ : @param request the request element
+ : @return the operation result
+ :)
+declare function m:execOperation_group($request as element())
+        as item()? {
+    a4:groupOP($request)        
 };
      
 (:~
@@ -263,7 +351,7 @@ declare function m:execOperation_prune($request as element())
  :)
 declare function m:execOperation_spec.keywords($request as element())
         as node() {
-    a2:spec.objectsOP($request)        
+    a5:spec.objectsOP($request)        
 };
      
 (:~
@@ -301,7 +389,11 @@ declare function m:execOperation($req as element())
         else if ($opName eq '_copyNcat') then m:execOperation__copyNcat($req)
         else if ($opName eq '_deleteNcat') then m:execOperation__deleteNcat($req)
         else if ($opName eq '_nodlSample') then m:execOperation__nodlSample($req)
+        else if ($opName eq 'mtree') then m:execOperation_mtree($req)
+        else if ($opName eq 'stree') then m:execOperation_stree($req)
         else if ($opName eq 'prune') then m:execOperation_prune($req)
+        else if ($opName eq 'jsref') then m:execOperation_jsref($req)
+        else if ($opName eq 'group') then m:execOperation_group($req)
         else if ($opName eq 'spec.keywords') then m:execOperation_spec.keywords($req)
         else if ($opName eq '_help') then m:execOperation__help($req)
         else

@@ -16,6 +16,7 @@ at "tt/_foxpath-fox-functions.xqm";
 
 declare namespace z="http://www.oaslab.org/ns/structure";
 
+
 declare function f:oasMsgObjects($oasElem as element())
         as element()* {
     let $opElems := f:oasOperationObjects($oasElem)        
@@ -57,6 +58,7 @@ declare function f:requiredSchemas($schemas as element()*)
     f:requiredSchemasRC($schemas, ())        
 };
 
+(:
 declare function f:requiredSchemasRC($schemas as element()*,
                                      $visited as element()*)
         as element()* {
@@ -69,9 +71,11 @@ declare function f:requiredSchemasRC($schemas as element()*,
             if ($tail) then f:requiredSchemasRC($tail, $visited)
             else $visited
         else
-            let $refs := $head//_0024ref/string()
-            let $referenced := $refs ! foxf:resolveJsonRef(., $head, 'single')
+            let $refs := trace($head//_0024ref/string() , '_ALL_REFS: ')
+            let $referenced := $refs ! foxf:resolveJsonRef(trace(., '_RESOLVE: '), $head, 'single')
+            let $_DEBUG := trace(count($referenced), '#REFERENCED: ')
             let $newTargets := $referenced except $visited
+            let $_DEBUG := trace($newTargets/generate-id(), '_NEW_TARGET_IDS: ')
             let $newVisited := $visited
             let $newTargetsRecursive := (
                 $newTargets,
@@ -80,6 +84,27 @@ declare function f:requiredSchemasRC($schemas as element()*,
             return
                 if ($tail) then f:requiredSchemasRC($tail, $newVisited)
                 else $newVisited
+};
+:)
+
+declare function f:requiredSchemasRC($schemas as element()*,
+                                     $visited as element()*)
+        as element()* {
+    if (empty($schemas)) then () else
+    
+    let $head := head($schemas)
+    let $tail := tail($schemas)
+    return
+        let $refs := $head//_0024ref/string()
+        let $referenced := $refs ! foxf:resolveJsonRef(., $head, 'single')
+        let $newTargets := $referenced except $visited
+        let $newVisited := ($visited, $newTargets)
+        let $newTargetsRecursive := (
+            $newTargets, f:requiredSchemasRC($newTargets, $newVisited))
+        let $newVisited := $newVisited | $newTargetsRecursive
+        return
+            if ($tail) then f:requiredSchemasRC($tail, $newVisited)
+            else $newVisited
 };
 
 (:~
