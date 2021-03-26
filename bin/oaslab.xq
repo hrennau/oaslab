@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-03-25T18:13:58.274+01:00 
+ : @version 2021-03-26T16:12:08.634+01:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -116,6 +116,7 @@ declare variable $toolScheme :=
       <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
       <param name="pathFilter" type="nameFilter?"/>
       <param name="operationFilter" type="nameFilter?"/>
+      <param name="statusFilter" type="nameFilter?"/>
       <param name="odir" type="xs:string?"/>
       <param name="addSuffix" type="xs:string?"/>
       <param name="addPrefix" type="xs:string?"/>
