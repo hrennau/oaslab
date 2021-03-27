@@ -108,6 +108,41 @@ declare function f:requiredSchemasRC($schemas as element()*,
 };
 
 (:~
+ : Returns the schema objects used by a given logical message object. A
+ : logical message object is an object representing a message used in a
+ : particular role (e.g. request or response in case of a particular HTTP
+ : status code), yet independently of the media type.
+ :
+ : In OAS version 2, the schema is the value of the "schema" keyword. 
+ : In OAS version 3, the logical message object is a Content Object containing 
+ : Media Type Objects, which may contain a "schema" keyword containing the 
+ : message schema.
+ :
+ : Parameter $filter is an optional filter controlling the selection of Media 
+ : Type Objects; default value is 'json'. See function 'selectMediaTypeObject'
+ : for details about the selection.
+ :
+ : Note that this function may return several schema objects.
+ :
+ : Note that a top-level JSON Schema $ref is not resolved.
+ :
+ : @param msgObject a message object
+ : @param filter an optional filter controlling the selection of Media Type Objects;
+ :   by default, the Media Type Object of application/json is selected, if existent,
+ :   or an arbitrarily selected Media Type Object with a *json* mediatype, if
+ :   existent, otherwise an arbitrarily selected Media Type Object is returned
+ : @return zero or more Schema Objects
+ :)
+declare function f:schemaFromLogicalMsgObject($lmsgObject as element(), 
+                                              $filter as xs:string)
+        as element()* {
+    $lmsgObject/(
+        schema,
+        f:selectMediaTypeObject(., $filter)/schema
+    )
+};        
+
+(:~
  : Selects from a Content Object a particular MediaType object.
  :
  : The selection is defined by parameter $filter. Currently, only

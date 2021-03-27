@@ -45,6 +45,9 @@ at "tt/_nameFilter.xqm";
 import module namespace foxf="http://www.foxpath.org/ns/fox-functions" 
 at "tt/_foxpath-fox-functions.xqm";    
 
+import module namespace shut="http://www.oaslab.org/ns/xquery-functions/schema-util" 
+at "schemaUtil.xqm";    
+
 import module namespace util="http://www.oaslab.org/ns/xquery-functions/util" 
 at "oaslabUtil.xqm";    
 
@@ -135,6 +138,7 @@ declare function f:mtree($oas as element()+,
     let $pathFilter := $options?pathFilter
     let $methodFilter := $options?methodFilter
     let $roleFilter := $options?roleFilter
+    let $optionsSchemaKey := map{'retainAnno': false(), 'retainExample': false()}
     
     let $docReports :=        
         for $doc in $oas
@@ -155,9 +159,10 @@ declare function f:mtree($oas as element()+,
                             parameters/_/foxf:jsonEffectiveValue(.)[in eq 'body'],
                             requestBody/foxf:jsonEffectiveValue(.)/content/nav:selectMediaTypeObject(., 'json')                        
                         )
+                        let $schemaKey := $msgo/schema ! shut:schemaKey(., ())
                         let $msgoTree := $msgo ! f:msgObjectTree(., $options)
                         where $msgoTree and (empty($roleFilter) or tt:matchesNameFilter('input', $roleFilter))
-                        return <z:msg role="input">{$msgoTree}</z:msg>
+                        return <z:msg role="input" schemaKey="{$schemaKey}">{$msgoTree}</z:msg>
                     let $rs := 
                         for $rs in $op/responses/*
                         let $jname := $rs/local-name(.) ! convert:decode-key(.)
@@ -174,9 +179,10 @@ declare function f:mtree($oas as element()+,
                         let $msgo :=
                             if ($rse[schema]) then $rse
                             else $rse/content/nav:selectMediaTypeObject(., 'json')
+                        let $schemaKey := $msgo/schema ! shut:schemaKey(., ())                            
                         let $msgoTree := $msgo ! f:msgObjectTree(., $options)
                         where empty($roleFilter) or tt:matchesNameFilter($role, $roleFilter)                        
-                        return $msgo ! <z:msg role="{$role}">{$msgoTree}</z:msg>
+                        return $msgo ! <z:msg role="{$role}" schemaKey="{$schemaKey}">{$msgoTree}</z:msg>
                     return ($rq, $rs)
                 where empty($methodFilter) or tt:matchesNameFilter($httpMethod, $methodFilter)                    
                 return
@@ -190,8 +196,11 @@ declare function f:mtree($oas as element()+,
                 <z:endpoint path="{$path}">{
                     $operationReports
                 }</z:endpoint>
+        let $msgUses := $endpointReports//z:msg
+        let $countMsgUses := count($msgUses)
+        let $countMsgs := count($msgUses/@schemaKey => distinct-values())
         return
-            <z:doc xml:base="{$doc/base-uri(.)}">{
+            <z:doc xml:base="{$doc/base-uri(.)}" countMsgs="{$countMsgs}" countMsgUses="{$countMsgUses}">{
                 $endpointReports
             }</z:doc>
     return 
