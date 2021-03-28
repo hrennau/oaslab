@@ -200,7 +200,11 @@ declare function f:mtree($oas as element()+,
         let $countMsgUses := count($msgUses)
         let $countMsgs := count($msgUses/@schemaKey => distinct-values())
         return
-            <z:doc xml:base="{$doc/base-uri(.)}" countMsgs="{$countMsgs}" countMsgUses="{$countMsgUses}">{
+            <z:doc xml:base="{$doc/base-uri(.)}" 
+                   countMsgs="{$countMsgs}" 
+                   countMsgUses="{$countMsgUses}"
+                   xmlns:oas="http://www.oaslab.org/ns/oas"
+                   xmlns:js="http://www.oaslab.org/ns/json-schema">{
                 $endpointReports
             }</z:doc>
     return 
@@ -239,7 +243,9 @@ declare function f:stree($oas as element()+,
                     $tree
                 }</z:schema>
         return
-            <z:doc xml:base="{$doc/base-uri(.)}">{
+            <z:doc xml:base="{$doc/base-uri(.)}"
+                   xmlns:oas="http://www.oaslab.org/ns/oas"
+                   xmlns:js="http://www.oaslab.org/ns/json-schema">{
                 $schemaReports
             }</z:doc>
             

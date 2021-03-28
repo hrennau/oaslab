@@ -20,6 +20,29 @@ at "oaslabUtil.xqm";
 declare namespace z="http://www.oaslab.org/ns/structure";
 
 (:~
+ : Returns the name of a referenced schema. The name here means the
+ : last step of the JSON Pointer identifying the referenced schema.
+ :
+ : @param ref a reference
+ : @return the name
+ :)
+declare function f:jrefName($ref as xs:string)
+        as xs:string {
+    replace($ref, '.*/', '') ! convert:decode-key(.)       
+};        
+
+(: Returns the child elements of a Schema Object representing
+ : constraints.
+ :
+ : @param schema a Schema Object
+ : @return the child elements representing constraints
+ :)
+declare function f:schemaConstraints($schema as element())
+        as element()* {
+    $schema/(* except (description, title))        
+};        
+
+(:~
  : Returns true if a JSON Schema node is a keyword, given a schema context.
  : The schema context has been determined by function `getJsContext`.
  :
@@ -63,11 +86,18 @@ declare function f:getJsContext($jsNode as element(), $parentJsContext as xs:str
  : Returns a schema key which can be used for checking the logical identity of
  : schemas.
  :
+ : If the schema has a recognized schema pattern for which a schema name is
+ : defined, the schema key is equal to the schema name. Otherwise, the key is 
+ : the serialization of a normalized copy of the schema.
+ :
  : @param node a node
  : @return the original JSON name of the node
  :)
 declare function f:schemaKey($schema as element(), $options as map(*)?)
-        as xs:string {
+        as xs:string {    
+    let $name := f:schemaPattern($schema) ? name
+    return if ($name) then $name else
+    
     let $normalized := f:cmpNormalizeSchema($schema, $options)
     let $key := f:schemaKeyForNormSchema($normalized)
     return $key
@@ -131,4 +161,52 @@ declare function f:cmpNormalizeSchem_copy(
             f:cmpNormalizeSchemaRC($node, $jsContext, $retainAnno, $retainExample, $options)
     }
 };
+
+(:~
+ : Returns a description of the schema consisting of a
+ : pattern name and an optional schema name.
+ :)
+declare function f:schemaPattern($schema as element())
+        as map(*) {
+    let $children := $schema ! f:schemaConstraints(.)
+    let $desc :=
+        if (count($children) ne 1) then ()
+        else
+            (: Pattern: named-schema 
+               --------------------- :)
+            if ($children/self::_0024ref) then
+                let $pattern := 'named-schema'            
+                let $name := $children/f:jrefName(.)
+                return map{'pattern': $pattern, 'name': $name}
+                    
+            (: Schema = array schema wo array-level constraints :)                    
+            else if ($children/self::items) then
+                let $itemsChildren := $children ! f:schemaConstraints(.)
+                return
+                    if (count($itemsChildren) ne 1) then () else
+
+                    (: Pattern: named-item-schema
+                       -------------------------- :)
+                    if ($itemsChildren/self::_0024ref) then
+                        let $pattern := 'named-item-schema'
+                        let $name := $pattern || '?' || $itemsChildren/f:jrefName(.)
+                        return map{'pattern': $pattern, 'name': $name}
+                            
+                    else if ($itemsChildren/self::items) then
+                        let $items2Children := $itemsChildren ! f:schemaConstraints(.)
+                        return
+                            if (count($items2Children) ne 1) then ()
+                            else
+                                (: Pattern: named-nested-item-schema
+                                   --------------------------------- :)
+                                if ($items2Children/self::_0024ref) then
+                                    let $pattern := 'named-nested-item-schema'
+                                    let $name :=  $pattern || '?'|| 
+                                        $items2Children/f:jrefName(.)
+                                    return map{'pattern': $pattern, 'name': $name}
+                                else ()
+    return
+        if (exists($desc)) then $desc
+        else map{'pattern': 'local-schema'}
+};   
 
