@@ -146,6 +146,7 @@ declare function f:prunePathsAndOperationsRC(
                 for $path in *
                 let $jname := trace( $path/local-name(.) ! convert:decode-key(.) , '___JNAME: ')
                 where empty($pathFilter) or tt:matchesNameFilter($jname, $pathFilter)
+                let $_DEBUG := trace($path/name(), '_PATH_ACCEPTED: ')
                 return f:prunePathsAndOperations_copy($path, $pathFilter, $opFilter, $statusFilter, $opElems)
             }        
         else f:prunePathsAndOperations_copy($n, $pathFilter, $opFilter, $statusFilter, $opElems)

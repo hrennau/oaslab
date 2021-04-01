@@ -28,8 +28,27 @@ declare namespace z="http://www.oaslab.org/ns/structure";
  :)
 declare function f:jrefName($ref as xs:string)
         as xs:string {
-    replace($ref, '.*/', '') ! convert:decode-key(.)       
+    replace($ref, '.*/', '')       
 };        
+
+(:~
+ : Returns the message role for a given message element.
+ :
+ : @param msgElem a message element
+ : @return the message role
+ :)
+declare function f:msgRole($msgElem as element())
+        as xs:string {
+    typeswitch($msgElem)
+    case element(requestBody) | element(_) return 'input'
+    case element(default) return 'fault'
+    case element(_003200) return 'output'
+    default return
+        let $jname := $msgElem/util:jname(.)
+        return
+            if (substring($jname, 1, 1) = ('2', '3')) then 'output-' || $jname
+            else 'fault-' || $jname
+};
 
 (: Returns the child elements of a Schema Object representing
  : constraints.
@@ -54,7 +73,7 @@ declare function f:isJsKeyword($jsContext as xs:string) as xs:boolean {
 };
 
 (:~
- : Determins the schema context established by a given JSON Schema node and
+ : Determines the schema context established by a given JSON Schema node and
  : the parent schema context. The parent schema context is the context in 
  : which the node appears.
  :
@@ -70,17 +89,74 @@ declare function f:isJsKeyword($jsContext as xs:string) as xs:boolean {
  : @param parentJsContext the schema context in which the parent node appears
  : @return the schema context established by the input node
  :)
-declare function f:getJsContext($jsNode as element(), $parentJsContext as xs:string)
+declare function f:getJsContext($node as node(), $parentJsContext as xs:string)
         as xs:string {
+    if (not($node instance of element())) then $parentJsContext else
+    
+    (: Begin with all cases where the new context is not implied by the node name,
+       but by the parent context :)
     switch($parentJsContext)
     case 'properties' return 'property-schema'
-    case 'property-schema' return $jsNode/local-name(.)
     case 'enum' return 'enum-value'
     case 'enum-value' return 'enum-value'
     case 'example' return 'example-content'
     case 'example-content' return 'example-content'
-    default return $jsNode/util:jname(.)
+    case 'required' return 'required-property'
+    case 'allOf' return 'allOf-schema'    
+    case 'oneOf' return 'oneOf-schema'
+    case 'anyOf' return 'anyOf-schema'
+    default return
+        let $jname := $node/util:jname(.)
+        return $jname
 };
+
+(:~
+ : Returns a description of the schema consisting of a
+ : pattern name and an optional schema name.
+ :)
+declare function f:schemaPattern($schema as element())
+        as map(*) {
+    let $children := $schema ! f:schemaConstraints(.)
+    let $desc :=
+        if (count($children) ne 1) then ()
+        else
+            (: Pattern: named-schema 
+               --------------------- :)
+            if ($children/self::_0024ref) then
+                let $pattern := 'named-schema'            
+                let $name := $children/f:jrefName(.)
+                return map{'pattern': $pattern, 'name': $name}
+                    
+            (: Schema = array schema wo array-level constraints :)                    
+            else if ($children/self::items) then
+                let $itemsChildren := $children ! f:schemaConstraints(.)
+                return
+                    if (count($itemsChildren) ne 1) then () else
+
+                    (: Pattern: named-item-schema
+                       -------------------------- :)
+                    if ($itemsChildren/self::_0024ref) then
+                        let $pattern := 'named-item-schema'
+                        let $name := $pattern || '?' || $itemsChildren/f:jrefName(.)
+                        return map{'pattern': $pattern, 'name': $name}
+                            
+                    else if ($itemsChildren/self::items) then
+                        let $items2Children := $itemsChildren ! f:schemaConstraints(.)
+                        return
+                            if (count($items2Children) ne 1) then ()
+                            else
+                                (: Pattern: named-nested-item-schema
+                                   --------------------------------- :)
+                                if ($items2Children/self::_0024ref) then
+                                    let $pattern := 'named-nested-item-schema'
+                                    let $name :=  $pattern || '?'|| 
+                                        $items2Children/f:jrefName(.)
+                                    return map{'pattern': $pattern, 'name': $name}
+                                else ()
+    return
+        if (exists($desc)) then $desc
+        else map{'pattern': 'local-schema'}
+};   
 
 (:~
  : Returns a schema key which can be used for checking the logical identity of
@@ -161,52 +237,4 @@ declare function f:cmpNormalizeSchem_copy(
             f:cmpNormalizeSchemaRC($node, $jsContext, $retainAnno, $retainExample, $options)
     }
 };
-
-(:~
- : Returns a description of the schema consisting of a
- : pattern name and an optional schema name.
- :)
-declare function f:schemaPattern($schema as element())
-        as map(*) {
-    let $children := $schema ! f:schemaConstraints(.)
-    let $desc :=
-        if (count($children) ne 1) then ()
-        else
-            (: Pattern: named-schema 
-               --------------------- :)
-            if ($children/self::_0024ref) then
-                let $pattern := 'named-schema'            
-                let $name := $children/f:jrefName(.)
-                return map{'pattern': $pattern, 'name': $name}
-                    
-            (: Schema = array schema wo array-level constraints :)                    
-            else if ($children/self::items) then
-                let $itemsChildren := $children ! f:schemaConstraints(.)
-                return
-                    if (count($itemsChildren) ne 1) then () else
-
-                    (: Pattern: named-item-schema
-                       -------------------------- :)
-                    if ($itemsChildren/self::_0024ref) then
-                        let $pattern := 'named-item-schema'
-                        let $name := $pattern || '?' || $itemsChildren/f:jrefName(.)
-                        return map{'pattern': $pattern, 'name': $name}
-                            
-                    else if ($itemsChildren/self::items) then
-                        let $items2Children := $itemsChildren ! f:schemaConstraints(.)
-                        return
-                            if (count($items2Children) ne 1) then ()
-                            else
-                                (: Pattern: named-nested-item-schema
-                                   --------------------------------- :)
-                                if ($items2Children/self::_0024ref) then
-                                    let $pattern := 'named-nested-item-schema'
-                                    let $name :=  $pattern || '?'|| 
-                                        $items2Children/f:jrefName(.)
-                                    return map{'pattern': $pattern, 'name': $name}
-                                else ()
-    return
-        if (exists($desc)) then $desc
-        else map{'pattern': 'local-schema'}
-};   
 

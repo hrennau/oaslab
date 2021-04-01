@@ -108,6 +108,53 @@ declare function f:requiredSchemasRC($schemas as element()*,
 };
 
 (:~
+ : Returns the message elements representing the message objects of an operation. 
+ :
+ : @param op an Operation Object
+ : @param filter an optional filter for media type objects
+ : @return the input messages
+ :)
+declare function f:operationInputMsg($op as element(), $filter as xs:string?)
+        as element()* {
+    $op/(
+        parameters/_/foxf:jsonEffectiveValue(.)[in eq 'body'],
+        requestBody/foxf:jsonEffectiveValue(.)/f:msgObjectFromLogicalMsgObject(., $filter)                        
+    )        
+};
+
+(:~
+ : Returns the message objects used by a given logical message object. A
+ : logical message object is an object representing a message used in a
+ : particular role (e.g. request or response in case of a particular HTTP
+ : status code), yet independently of the media type.
+ :
+ : In OAS version 2, the message object is equal to the logical message object. 
+ : In OAS version 3, the logical message object is a Content Object containing 
+ : Media Type Objects, which may the message objects.
+ :
+ : Parameter $filter is an optional filter controlling the selection of Media 
+ : Type Objects; default value is 'json'. See function 'selectMediaTypeObject'
+ : for details about the selection.
+ :
+ : Note that this function may return several message objects.
+ :
+ : @param msgObject a message object
+ : @param filter an optional filter controlling the selection of Media Type Objects;
+ :   by default, the Media Type Object of application/json is selected, if existent,
+ :   or an arbitrarily selected Media Type Object with a *json* mediatype, if
+ :   existent, otherwise an arbitrarily selected Media Type Object is returned
+ : @return zero or more Schema Objects
+ :)
+declare function f:msgObjectFromLogicalMsgObject($lmsgObject as element(), 
+                                                 $filter as xs:string)
+        as element()* {
+    $lmsgObject/(
+        .[schema],
+        content/f:selectMediaTypeObject(., $filter)
+    )
+};        
+
+(:~
  : Returns the schema objects used by a given logical message object. A
  : logical message object is an object representing a message used in a
  : particular role (e.g. request or response in case of a particular HTTP
@@ -143,7 +190,11 @@ declare function f:schemaFromLogicalMsgObject($lmsgObject as element(),
 };        
 
 (:~
- : Selects from a Content Object a particular MediaType object.
+ : Selects from a logical message object a particular MediaType object.
+ :
+ : If the logical message object is not a Content Object, the
+ : input object is returned. (Version 2 - logical message object
+ : = mediatype message object.) 
  :
  : The selection is defined by parameter $filter. Currently, only
  : the value 'json' is supported. The selection thus specified 
@@ -157,9 +208,11 @@ declare function f:schemaFromLogicalMsgObject($lmsgObject as element(),
  : @param filter defines the selection
  : @return the selected MediaType Objects
  :)
-declare function f:selectMediaTypeObject($content as element(content),
+declare function f:selectMediaTypeObject($content as element(),
                                          $filter as xs:string)
         as element()* {
+    if (not($content/self::content)) then $content else
+    
     if ($filter eq 'json') then
         let $set1 := (
             $content/*[convert:decode-key(name(.)) eq 'application/json'],

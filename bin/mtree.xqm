@@ -123,7 +123,6 @@ declare function f:streeOP($request as element())
         f:stree($oas, $options)
 };
 
-
 (:~
  : Creates a message tree report. Details later ...
  :
@@ -141,11 +140,225 @@ declare function f:mtree($oas as element()+,
     let $optionsSchemaKey := map{'retainAnno': false(), 'retainExample': false()}
     
     let $docReports :=        
+        for $doc in $oas 
+        return
+            f:oasMsgTrees($doc, $options)
+    return 
+        if ($odir) then
+            $docReports ! util:writeFile(., base-uri(.) ! file:name(.) ! replace(., '\.json$', '.xml'), $options)
+        else
+            <z:docs count="{count($docReports)}" 
+                    xmlns:oas="http://www.oaslab.org/ns/oas"
+                    xmlns:js="http://www.oaslab.org/ns/json-schema">{
+                $docReports
+            }</z:docs>
+};
+
+(:~
+ : Creates a message tree report. Details later ...
+ :
+ : @param oas one or several OpenAPI documents, as XML node trees
+ : @return a JSON Schema References Report
+ :) 
+declare function f:oasMsgTrees($oas as element(),
+                               $options as map(xs:string, item()*)?)
+        as element() {
+    let $bare := $options?bare
+    let $optionsOasMsgObjectTree := map:put($options, 'withSchemaDict', not($bare))    
+    let $treeAndSchemaDict := f:oasMsgObjectTree($oas, $optionsOasMsgObjectTree)        
+    let $tree := 
+        <z:msgObjectTree>{
+            $treeAndSchemaDict[. instance of node()]/(@*, *)
+        }</z:msgObjectTree>
+    let $schemaDict := $treeAndSchemaDict[. instance of map(*)]
+    let $schemaTrees := if ($bare) then () else
+        for $key in map:keys($schemaDict)
+        let $tree := jt:jtree($schemaDict($key), $options)
+        let $schemaName := $key[not(starts-with(., '<'))]
+        let $schemaKey := $key[starts-with(., '<')]
+        order by lower-case($key)
+        return
+            <z:msg>{
+                $schemaName ! attribute schemaName {.},
+                $schemaKey ! attribute schemaKey {.},
+                $tree
+            }</z:msg> 
+    let $schemaTreeDict := if ($bare) then () else
+        <z:msgs count="{count($schemaTrees)}"
+                xmlns:js="http://www.oaslab.org/ns/json-schema">{
+            $schemaTrees
+        }</z:msgs>   
+    let $report :=
+        <z:oas>{
+            $tree/@*,
+            $schemaTreeDict,
+            $tree
+        }</z:oas>
+    return $report
+};
+
+(:~
+ : Creates a message object tree and (optionally) a schema dictionary.
+ :
+ : @param oas one or several OpenAPI documents, as XML node trees
+ : @return message objects trees and an optional message dictionary
+ :) 
+declare function f:oasMsgObjectTree(
+                         $oas as element(),
+                         $options as map(xs:string, item()*)?)
+        as item()+ {
+    let $withSchemaDict := $options?withSchemaDict
+    
+    let $fn_msgElem := 
+        function($role, $mediatype, $schemaKey) {
+            element z:msg {
+                attribute role {$role}, 
+                $mediatype ! attribute mediaType {$mediatype}, 
+                attribute schemaKey {$schemaKey}
+            }        
+        }
+        
+    let $pathFilter := $options?pathFilter
+    let $methodFilter := $options?methodFilter
+    let $roleFilter := $options?roleFilter
+    let $optionsSchemaKey := map{'retainAnno': false(), 'retainExample': false()}
+    let $oasTreeContentEtc := 
+        let $pathElemsEtc :=        
+            for $pathItem in $oas/paths/*
+            let $path := $pathItem/util:jname(.)
+            let $effectivePathItem := $pathItem/foxf:jsonEffectiveValue(.)            
+            let $opElemsEtc := 
+                for $op in $effectivePathItem/
+                    (get, post, put, delte, head, options, patch, trace)
+                let $httpMethod := $op/local-name(.)
+                let $msgElemsEtc := (
+                    let $msgo := nav:operationInputMsg($op, 'json')[1] 
+                    let $mediatype := $msgo[parent::content]/util:jname(.)
+                    let $schemaElem := $msgo/schema
+                    let $schemaKey := $schemaElem ! shut:schemaKey(., ())
+                    where $schemaKey and (empty($roleFilter) or 
+                            tt:matchesNameFilter('input', $roleFilter))
+                    return (
+                        map:entry($schemaKey, $schemaElem),
+                        $fn_msgElem('input', $mediatype, $schemaKey))
+                    ,
+                    for $rs in $op/responses/*
+                    let $msgRole := $rs/shut:msgRole(.)
+                    let $msgo := $rs/foxf:jsonEffectiveValue(.)
+                        /nav:msgObjectFromLogicalMsgObject(., 'json')[1]
+                    let $mediatype := $msgo[parent::content]/util:jname(.)           
+                    let $schemaElem := $msgo/schema
+                    let $schemaKey := $schemaElem ! shut:schemaKey(., ())
+                    where $schemaKey and (empty($roleFilter) or 
+                        tt:matchesNameFilter($msgRole, $roleFilter))
+                    order by 
+                        if (starts-with($msgRole, 'input')) then 1 
+                        else if (starts-with($msgRole, 'output')) then 2
+                        else 3,
+                        $msgRole
+                    return (
+                        map:entry($schemaKey, $schemaElem),
+                        $fn_msgElem($msgRole, $mediatype, $schemaKey))
+                )
+                let $msgElems := $msgElemsEtc[. instance of node()]
+                let $schemaDictEntries := $msgElemsEtc[not(. instance of node())][$withSchemaDict]
+                where exists($msgElems) and (empty($methodFilter) or 
+                    tt:matchesNameFilter($httpMethod, $methodFilter))                
+                return (
+                    $schemaDictEntries,
+                    <z:operation method="{$httpMethod}">{
+                        $op/operationId ! attribute operationId {.},
+                        $msgElems
+                    }</z:operation>)
+            let $opElems := $opElemsEtc[. instance of node()]        
+            let $schemaDictEntries := $opElemsEtc[not(. instance of node())]
+
+            where empty($pathFilter) or tt:matchesNameFilter($path, $pathFilter)                    
+            order by lower-case($path)
+            return (
+                $schemaDictEntries,
+                <z:endpoint path="{$path}">{$opElems}</z:endpoint>)
+        let $pathElems := $pathElemsEtc[. instance of node()] 
+        let $schemaDictEntries := $pathElemsEtc[. instance of map(*)][$withSchemaDict]
+        return (
+            $schemaDictEntries,
+            $pathElems
+        )
+        
+    let $oasTreeContent := $oasTreeContentEtc[. instance of node()]
+    let $schemaDictEntries := $oasTreeContentEtc[not(. instance of node())]
+      
+    let $schemaKeys := $oasTreeContent//@schemaKey
+    let $countMsgUses := count($schemaKeys)    
+    let $countMsgs := count($schemaKeys => distinct-values())
+    let $oasTree := <z:oas xml:base="{$oas/base-uri(.)}"
+                           countMsgs="{$countMsgs}"
+                           countMsgUses="{$countMsgUses}" 
+    >{$oasTreeContent}</z:oas>
+    let $schemaDict := map:merge($schemaDictEntries)[$withSchemaDict]
+    
+    let $schemaKeyMappings := f:getSchemaKeyMappings($oasTree)    
+    let $oasTreeEdited :=
+        if (empty($schemaKeyMappings)) then $oasTree else
+            copy $oasTree_copy := $oasTree
+            modify 
+                for $key in map:keys($schemaKeyMappings) return
+                    for $schemaKey in $oasTree_copy//@schemaKey[. eq $key]
+                    return replace value of node $schemaKey with $schemaKeyMappings($key)
+            return $oasTree_copy  
+    let $schemaDictEdited :=
+        if (not($withSchemaDict)) then ()
+        else if (empty($schemaKeyMappings)) then $schemaDict else
+            let $keysToBeReplaced := map:keys($schemaKeyMappings)
+            let $keysDict := $schemaDict ! map:keys($schemaDict)
+            return map:merge((
+                $keysDict[not(. = $keysToBeReplaced)] ! map:entry(., $schemaDict(.)),
+                for $key in $keysToBeReplaced return
+                    $schemaKeyMappings($key) ! map:entry(., $schemaDict($key))
+            ))
+    return (
+        $schemaDictEdited,
+        $oasTreeEdited
+    )
+};
+
+declare function f:getSchemaKeyMappings($oasTree as element())
+        as map(*)? {
+    let $schemaKeys := $oasTree//@schemaKey[starts-with(., '<')]
+    return
+        if (empty($schemaKeys)) then () else
+            map:merge((
+                for $schemaKey in $schemaKeys
+                group by $keyValue := string($schemaKey)
+                return $schemaKey[1]/map:entry(., string-join((
+                    ancestor::z:endpoint[1]/@path,
+                    ancestor::z:operation[1]//@method,
+                    ancestor::z:msg[1]/@role), '###'))
+            ))                    
+};
+
+(:~
+ : Creates a message tree report. Details later ...
+ :
+ : @param oas one or several OpenAPI documents, as XML node trees
+ : @return a JSON Schema References Report
+ :) 
+declare function f:mtreeOld($oas as element()+,
+                            $options as map(xs:string, item()*)?)
+        as item()? {
+        
+    let $odir := $options?odir        
+    let $pathFilter := $options?pathFilter
+    let $methodFilter := $options?methodFilter
+    let $roleFilter := $options?roleFilter
+    let $optionsSchemaKey := map{'retainAnno': false(), 'retainExample': false()}
+    
+    let $docReports :=        
         for $doc in $oas
         let $endpointReports :=            
             let $pathItems := $doc/paths/*
             for $pathItem in $pathItems
-            let $path := $pathItem/local-name(.) ! convert:decode-key(.)
+            let $path := $pathItem/util:jname(.)
             let $effectivePathItem := $pathItem/foxf:jsonEffectiveValue(.)
             
             let $operationReports :=

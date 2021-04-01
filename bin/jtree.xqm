@@ -17,6 +17,9 @@ at "tt/_foxpath-fox-functions.xqm";
 import module namespace ref="http://www.oaslab.org/ns/xquery-functions/ref" 
 at "ref.xqm";    
 
+import module namespace shut="http://www.oaslab.org/ns/xquery-functions/schema-util" 
+at "schemaUtil.xqm";    
+
 import module namespace util="http://www.oaslab.org/ns/xquery-functions/util" 
 at "oaslabUtil.xqm";    
 
@@ -61,6 +64,73 @@ declare function f:jtree($schema as element(),
  : @return the processed input node
  :)
 declare function f:jtree01RC($n as node(), 
+                           $flat as xs:boolean?,
+                           $schemaContext as xs:string?,
+                           $visited as node()*)
+        as node()* {
+    if ($n intersect $visited) then attribute recursiveContent {'yes'} else    
+    
+    let $newVisited := ($visited, $n)    
+    let $nextSchemaContext := shut:getJsContext($n, $schemaContext)
+    return
+    
+    typeswitch($n)
+    
+    (: Reference is expanded :)
+    case element(_0024ref) return
+        let $typeName := $n ! replace(., '^.*/', '')
+        return
+            if ($flat) then <z:schema ref="{$typeName}"/>
+            else
+                let $referenced := $n/foxf:resolveJsonRef(., ., 'single')
+                let $content := $referenced/node() 
+                    ! f:jtree01RC(., $flat, 'named-schema', $newVisited)
+                return 
+                    <z:schema name="{$typeName}">{
+                        util:attsElems($content)}</z:schema>
+            
+    (: Properties :)
+    case element(properties) return
+        <js:properties>{
+            for $p in $n/*
+            let $pSchemaContext := $p ! shut:getJsContext(., $nextSchemaContext)
+            return f:jtree01_copy(
+                $p, $flat, $pSchemaContext, '#local-name', $newVisited)
+        }</js:properties>
+        
+    case element(_) return
+        let $_DEBUG := if (not($n/parent::xxx)) then () else trace(
+            $schemaContext, '___XXX_ITEM_SCHEMA_CONTEXT: ') return
+        
+        let $name :=
+            switch($schemaContext)
+            case 'enum' return 'z:enumValue'
+            case 'required' return 'z:requiredProperty'            
+            case 'allOf' return 'z:schema'
+            case 'oneOf' return 'z:schema'
+            case 'anyOf' return 'z:schema'            
+            default return $n/local-name(.)
+        return
+            f:jtree01_copy($n, $flat, $nextSchemaContext, $name, $newVisited)
+            
+    (: Other element :)
+    case element() return
+        let $_DEBUG := if (not($n/self::xxx)) then () else trace(
+            $nextSchemaContext, '___XXX_NEXT_SCHEMA_CONTEXT: ') return
+        
+        let $elemName :=
+            switch($schemaContext)
+            case 'example' return '#local-name'
+            case 'example-content' return '#local-name'
+            default return '#js-name'
+        return f:jtree01_copy($n, $flat, $nextSchemaContext, $elemName, $newVisited)
+      
+    case attribute(type) return ()
+    
+    default return $n                
+};   
+
+declare function f:jtree01RC_old($n as node(), 
                            $flat as xs:boolean?,
                            $schemaContext as xs:string?,
                            $visited as node()*)
