@@ -15,6 +15,7 @@
          <param name="pathFilter" type="nameFilter?"/>
          <param name="methodFilter" type="nameFilter?"/>
          <param name="roleFilter" type="nameFilter?"/>
+         <param name="schemaKeyStyle" type="xs:string?" fct_values="path, pathname" default="path"/>
          <param name="odir" type="xs:string?"/>
          <param name="addSuffix" type="xs:string?"/>
          <param name="addPrefix" type="xs:string?"/>
@@ -45,8 +46,14 @@ at "tt/_nameFilter.xqm";
 import module namespace foxf="http://www.foxpath.org/ns/fox-functions" 
 at "tt/_foxpath-fox-functions.xqm";    
 
+import module namespace name="http://www.oaslab.org/ns/xquery-functions/name-util" 
+at "nameUtil.xqm";    
+
 import module namespace shut="http://www.oaslab.org/ns/xquery-functions/schema-util" 
 at "schemaUtil.xqm";    
+
+import module namespace spat="http://www.oaslab.org/ns/xquery-functions/schema-pattern" 
+at "schemaPattern.xqm";    
 
 import module namespace util="http://www.oaslab.org/ns/xquery-functions/util" 
 at "oaslabUtil.xqm";    
@@ -67,6 +74,7 @@ declare function f:mtreeOP($request as element())
         as item()? {
     let $oas := tt:getParam($request, 'oas')/*
     let $flat := tt:getParam($request, 'flat')
+    let $schemaKeyStyle := tt:getParam($request, 'schemaKeyStyle')    
     let $bare := tt:getParam($request, 'bare')
     let $odir := tt:getParam($request, 'odir')
     let $addSuffix := tt:getParam($request, 'addSuffix')
@@ -79,7 +87,8 @@ declare function f:mtreeOP($request as element())
     
     let $options := map:merge((
         $flat ! map:entry('flat', .),
-        $bare ! map:entry('bare', .),        
+        $schemaKeyStyle ! map:entry('schemaKeyStyle', .),        
+        $bare ! map:entry('bare', .), 
         $odir ! map:entry('odir', .),
         $addSuffix ! map:entry('addSuffix', .),
         $addPrefix ! map:entry('addPrefix', .),
@@ -208,6 +217,7 @@ declare function f:oasMsgObjectTree(
                          $options as map(xs:string, item()*)?)
         as item()+ {
     let $withSchemaDict := $options?withSchemaDict
+    let $schemaKeyStyle := $options?schemaKeyStyle
     
     let $fn_msgElem := 
         function($role, $mediatype, $schemaKey) {
@@ -297,7 +307,7 @@ declare function f:oasMsgObjectTree(
     >{$oasTreeContent}</z:oas>
     let $schemaDict := map:merge($schemaDictEntries)[$withSchemaDict]
     
-    let $schemaKeyMappings := f:getSchemaKeyMappings($oasTree)    
+    let $schemaKeyMappings := f:getSchemaKeyMappings($oasTree, $schemaDict, $schemaKeyStyle)    
     let $oasTreeEdited :=
         if (empty($schemaKeyMappings)) then $oasTree else
             copy $oasTree_copy := $oasTree
@@ -322,7 +332,9 @@ declare function f:oasMsgObjectTree(
     )
 };
 
-declare function f:getSchemaKeyMappings($oasTree as element())
+declare function f:getSchemaKeyMappings($oasTree as element(), 
+                                        $schemaDict as map(*),
+                                        $schemaKeyStyle as xs:string)
         as map(*)? {
     let $schemaKeys := $oasTree//@schemaKey[starts-with(., '<')]
     return
@@ -330,11 +342,29 @@ declare function f:getSchemaKeyMappings($oasTree as element())
             map:merge((
                 for $schemaKey in $schemaKeys
                 group by $keyValue := string($schemaKey)
-                return $schemaKey[1]/map:entry(., string-join((
-                    ancestor::z:endpoint[1]/@path,
-                    ancestor::z:operation[1]//@method,
-                    ancestor::z:msg[1]/@role), '###'))
-            ))                    
+                return 
+                    switch($schemaKeyStyle)
+                    
+                    (: Style 'pathname' - use a mapping of URI path/method/msgRole to an XML name :)
+                    case 'pathname' return
+                        let $schemaKey1 := $schemaKey[1]
+                        let $schema := $schemaDict($schemaKey1)                        
+                        let $operationId := $schemaKey1/ancestor::z:operation/@operationId                 
+                        let $uriPath := $schemaKey1/ancestor::z:endpoint/@path
+                        let $httpMethod := $schemaKey1/ancestor::z:operation/@method
+                        let $msgRole := $schemaKey1/ancestor::z:msg/@role
+                        let $name := $schema/spat:msgNodeName(., $operationId, $uriPath, $httpMethod, $msgRole, true())
+                                     ?msgNodeName
+                        let $_DEBUG := trace($name, '_SCHEMA__NAME: ')
+                        return map:entry($schemaKey1, $name)
+
+
+                    default return
+                        $schemaKey[1]/map:entry(., string-join((
+                            ancestor::z:endpoint[1]/@path,
+                            ancestor::z:operation[1]//@method,
+                            ancestor::z:msg[1]/@role), '###'))
+                    ))                    
 };
 
 (:~

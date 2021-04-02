@@ -105,7 +105,7 @@ declare function f:editFileName($fileName as xs:string,
         else
             let $from := replace($replacement, '=.*', '')
             let $to := replace($replacement, '^.*?=', '')
-            return replace($fileName, $from, $to, 'i')
+            return trace(replace($fileName, $from, $to, 'i') , '_FNAME: ')
     let $fname2 := $addPrefix || $fname1
     let $fname3 := 
         if (not($addSuffix)) then $fname2

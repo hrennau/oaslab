@@ -47,6 +47,7 @@ declare function f:pruneOP($request as element())
     let $pathFilter := tt:getParam($request, 'pathFilter')
     let $opFilter := tt:getParam($request, 'operationFilter')
     let $statusFilter := tt:getParam($request, 'statusFilter')
+    
     let $odir := tt:getParam($request, 'odir')
     let $addSuffix := tt:getParam($request, 'addSuffix')
     let $addPrefix := tt:getParam($request, 'addPrefix')

@@ -1,7 +1,7 @@
 (:
  : -------------------------------------------------------------------------
  :
- : schemaUtil.xqm - some general tools supporting the evaluation of JSON Schema content
+ : schemaUtil.xqm - tools supporting the evaluation of JSON Schema content
  :
  : -------------------------------------------------------------------------
  :)

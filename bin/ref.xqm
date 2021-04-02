@@ -111,3 +111,14 @@ declare function f:expandRefRC($object as element(),
             default return $child                
     }
 };        
+
+(:~
+ : Extracts from a reference the name of the last step.
+ :
+ : @param ref a JSON reference
+ : @return the name of the last step
+ :)
+declare function f:refValueName($ref as xs:string)
+        as xs:string {
+    replace($ref, '.*/', '')            
+};        
