@@ -42,9 +42,10 @@ declare function f:jtree($schema as element(),
     let $flat := $options?flat
     let $bare := $options?bare
     let $tree01 := $schema ! f:jtree01RC(., $flat, 'schema', ())
-    let $tree02 := $tree01 ! f:jtree02RC(., $flat, 'schema', ())
-    let $tree03 := $tree02 ! f:jtree03RC(., $flat, 'schema', ())
-    let $tree04 := $tree03 ! f:jtree04RC(., $flat, 'schema', ())
+    let $tree02 := $tree01 ! f:jtreePropertyAttsRC(., $flat, 'schema', ())
+    let $tree02 := $tree01 (: Switch off the shifting of property details into details :)
+    let $tree03 := $tree02 ! f:jtreeRequiredRC(., $flat, 'schema', ())
+    let $tree04 := $tree03 ! f:jtreePruneRC(., $flat, 'schema', ())
     let $tree05 := 
         if (not($bare)) then $tree04
         else $tree04 ! f:jtreeBareRC(., $flat, 'schema', ())
@@ -198,7 +199,8 @@ declare function f:jtree01RC_old($n as node(),
  : @param visited nodes already visited
  : @return the processed input node
  :)
-declare function f:jtree02RC($n as node(), 
+declare function f:jtreePropertyAttsRC(
+                           $n as node(), 
                            $flat as xs:boolean?,
                            $schemaContext as xs:string?,
                            $visited as node()*)
@@ -226,7 +228,7 @@ declare function f:jtree02RC($n as node(),
             if ($n/parent::js:properties) then 'property-schema'
             else local-name($n)
         return
-            f:jtree02_copy($n, $flat, $newSchemaContext, (), $newVisited)
+            f:jtreePropertyAtts_copy($n, $flat, $newSchemaContext, (), $newVisited)
 
     default return $n
 };   
@@ -243,7 +245,8 @@ declare function f:jtree02RC($n as node(),
  : @param visited nodes already visited
  : @return the processed input node
  :)
-declare function f:jtree03RC($n as node(), 
+declare function f:jtreeRequiredRC(
+                           $n as node(), 
                            $flat as xs:boolean?,
                            $schemaContext as xs:string?,
                            $visited as node()*)
@@ -257,20 +260,21 @@ declare function f:jtree03RC($n as node(),
         let $pnames := $n/*/util:jname(.) return
         
         element {node-name($n)} {
-            $n/@* ! f:jtree03RC(., $flat, 'properties', $visited),
+            $n/@* ! f:jtreeRequiredRC(., $flat, 'properties', $visited),
 
             for $child in $n/*
-            let $addAttributes := 
-                if ($child/util:jname(.) = $n/../js:required/z:requiredProperty) then attribute required {true()}
+            let $addElems := 
+                if ($child/util:jname(.) = $n/../js:required/z:requiredProperty) then 
+                    <z:required>true</z:required>
                 else ()
             return
-                f:jtree03_copy($child, $flat, 'property-schema', (), $addAttributes, $newVisited),
+                f:jtreeRequired_copy($child, $flat, 'property-schema', (), $addElems, $newVisited),
                 
             for $requiredProperty in $n/../js:required/z:requiredProperty[not(. = $pnames)]
             return
                 element {$requiredProperty ! convert:encode-key(.)} {
-                    attribute required {'true'},
-                    attribute added {'because-required'}
+                    <z:required>true</z:required>,
+                    <z:added>because-required</z:added>
                 }
         }
         
@@ -283,13 +287,13 @@ declare function f:jtree03RC($n as node(),
                 <js:properties>{
                     $requiredAdditionalPnames !
                     element {. ! convert:encode-key(.)} {
-                        attribute required {'true'},
-                        attribute added {'because-required'}
+                        <z:required>true</z:required>,
+                        <z:added>because-required</z:added>
                     }
                 }</js:properties>
     
     case element() return        
-        f:jtree03_copy($n, $flat, $n/local-name(.), (), (), $newVisited)
+        f:jtreeRequired_copy($n, $flat, $n/local-name(.), (), (), $newVisited)
         
     default return $n        
 };   
@@ -307,10 +311,11 @@ declare function f:jtree03RC($n as node(),
  : @param visited nodes already visited
  : @return the processed input node
  :)
-declare function f:jtree04RC($n as node(), 
-                             $flat as xs:boolean?,
-                             $schemaContext as xs:string?,
-                             $visited as node()*)
+declare function f:jtreePruneRC(
+                        $n as node(), 
+                        $flat as xs:boolean?,
+                        $schemaContext as xs:string?,
+                        $visited as node()*)
         as node()* {
     if ($n intersect $visited) then attribute recursiveContent {'yes'} else    
     let $newVisited := ($visited, $n) return
@@ -321,7 +326,7 @@ declare function f:jtree04RC($n as node(),
         let $nextElem :=
             if ($n/(not(@*) and count(*) eq 1 and z:schema)) then $n/z:schema
             else $n
-        return $nextElem ! f:jtree04_copy(., $flat, 'schema', (), $newVisited)
+        return $nextElem ! f:jtreePrune_copy(., $flat, 'schema', (), $newVisited)
 
     case element(js:allOf) | element(js:oneOf) | element(js:anyOf) return
         (: Single child :)
@@ -329,13 +334,13 @@ declare function f:jtree04RC($n as node(),
             let $nextElem :=
                 if ($n/*/(not(@*) and count(*) eq 1 and z:schema)) then $n/*/*
                 else $n/*
-            return $nextElem ! f:jtree04_copy(., $flat, 'schema', (), $newVisited)
+            return $nextElem ! f:jtreePrune_copy(., $flat, 'schema', (), $newVisited)
         (: Multiple children :)
         else 
-            $n ! f:jtree04_copy(., $flat, $n/local-name(.), (), $newVisited)
+            $n ! f:jtreePrune_copy(., $flat, $n/local-name(.), (), $newVisited)
         
     case element() return
-        $n ! f:jtree04_copy(., $flat, $n/local-name(.), (), $newVisited)    
+        $n ! f:jtreePrune_copy(., $flat, $n/local-name(.), (), $newVisited)    
         
     default return $n        
 };   
@@ -490,7 +495,7 @@ declare function f:jtree01_copy($e as element(),
 };        
 
 (:~
- : Helper function of function `jtree02RC`. Returns a processed
+ : Helper function of function `jtreePropertyAttsRC`. Returns a processed
  : copy of the input element.
  
  : @param e an element to be preocessed
@@ -499,7 +504,8 @@ declare function f:jtree01_copy($e as element(),
  : @return a processed copy of the input element
  
  :)
-declare function f:jtree02_copy($e as element(), 
+declare function f:jtreePropertyAtts_copy(
+                              $e as element(), 
                               $flat as xs:boolean?,
                               $schemaContext as xs:string?,
                               $elemName as xs:string?,
@@ -509,8 +515,8 @@ declare function f:jtree02_copy($e as element(),
         if ($elemName) then $elemName
         else node-name($e)
     let $content := (
-        $e/@* ! f:jtree02RC(., $flat, $schemaContext, $visited),
-        $e/node() ! f:jtree02RC(., $flat, $schemaContext, $visited))
+        $e/@* ! f:jtreePropertyAttsRC(., $flat, $schemaContext, $visited),
+        $e/node() ! f:jtreePropertyAttsRC(., $flat, $schemaContext, $visited))
     let $contentAtts := $content[self::attribute()]
     let $contentElems := $content except $contentAtts
     return
@@ -521,7 +527,7 @@ declare function f:jtree02_copy($e as element(),
 };        
 
 (:~
- : Helper function of function `jtree03RC`. Returns a processed
+ : Helper function of function `jtreeRequiredRC`. Returns a processed
  : copy of the input element.
  
  : @param e an element to be preocessed
@@ -530,31 +536,32 @@ declare function f:jtree02_copy($e as element(),
  : @return a processed copy of the input element
  
  :)
-declare function f:jtree03_copy($e as element(), 
+declare function f:jtreeRequired_copy(
+                              $e as element(), 
                               $flat as xs:boolean?,
                               $schemaContext as xs:string?,
                               $elemName as xs:string?,
-                              $additionalAttributes as attribute()*,
+                              $additionalElems as element()*,
                               $visited as node()*)
         as element() {
     let $name := 
         if ($elemName) then $elemName
         else node-name($e)
     let $content := (
-        $e/@* ! f:jtree03RC(., $flat, $schemaContext, $visited),
-        $e/node() ! f:jtree03RC(., $flat, $schemaContext, $visited))
+        $e/@* ! f:jtreeRequiredRC(., $flat, $schemaContext, $visited),
+        $e/node() ! f:jtreeRequiredRC(., $flat, $schemaContext, $visited))
     let $contentAtts := $content[self::attribute()]
     let $contentElems := $content except $contentAtts
     return
         element {$name} {
-            $additionalAttributes,
             $contentAtts,
+            $additionalElems,
             $contentElems
         }
 };        
 
 (:~
- : Helper function of function `jtree04RC`. Returns a processed
+ : Helper function of function `jtreePruneRC`. Returns a processed
  : copy of the input element.
  
  : @param e an element to be preocessed
@@ -563,18 +570,19 @@ declare function f:jtree03_copy($e as element(),
  : @return a processed copy of the input element
  
  :)
-declare function f:jtree04_copy($e as element(), 
-                              $flat as xs:boolean?,
-                              $schemaContext as xs:string?,
-                              $elemName as xs:string?,
-                              $visited as node()*)
+declare function f:jtreePrune_copy(
+                        $e as element(), 
+                        $flat as xs:boolean?,
+                        $schemaContext as xs:string?,
+                        $elemName as xs:string?,
+                        $visited as node()*)
         as element() {
     let $name := 
         if ($elemName) then $elemName
         else node-name($e)
     let $content := (
-        $e/@* ! f:jtree04RC(., $flat, $schemaContext, $visited),
-        $e/node() ! f:jtree04RC(., $flat, $schemaContext, $visited))
+        $e/@* ! f:jtreePruneRC(., $flat, $schemaContext, $visited),
+        $e/node() ! f:jtreePruneRC(., $flat, $schemaContext, $visited))
     let $contentAtts := $content[self::attribute()]
     let $contentElems := $content except $contentAtts
     return

@@ -168,14 +168,23 @@ declare function f:normalizeAllOfRC2($n as node(),
         document {$n/node() ! f:normalizeAllOfRC2(., $options)}
     case element(js:allOf) return
         let $children := $n/node() ! f:normalizeAllOfRC2(., $options)
+        let $subschemasRaw :=
+            for $child in $children 
+            let $allOfSubschemas := (
+                $child/self::js:allOf/node(),
+                $child/self::z:schema/js:allOf/node())
+            return
+                if ($allOfSubschemas) then $allOfSubschemas
+                else $child
+        (: Remove duplicate schemas :)
+        let $subschemas :=
+            for $subschema at $pos in $subschemasRaw
+            group by $subschemaName := ($subschema/@name, $pos)[1]
+            return $subschema[1]
         return
             element {node-name($n)} {
                 $n/@* !  f:normalizeAllOfRC2(., $options),
-                for $child in $children 
-                let $allOfSubschemas := $child/self::z:schema/js:allOf/node()
-                return
-                    if ($allOfSubschemas) then $allOfSubschemas
-                    else $child
+                $subschemas
             }
     case element() return
         element {node-name($n)} {
@@ -360,6 +369,30 @@ declare function f:mergeAllOfConstraintPair_properties(
     let $propertyNames1 := $constraint1Content/local-name(.)        
     let $propertyNames2 := $constraint2Content/local-name(.)
     
+    let $allPropertyNames := ($propertyNames1, $propertyNames2) => distinct-values()
+    
+    let $properties := (
+        for $property1 in $constraint1Content
+        let $property2 := $constraint2Content[local-name(.) eq $property1/local-name(.)]
+        return
+            if (not($property2)) then $property1
+            else
+                let $schema1 :=            
+                    if ($property1/js:allOf) then $property1/js:allOf/*
+                    else
+                        <z:schema>{
+                            $property1/* ! f:mergeAllOfConstraintsRC(., ()) 
+                        }</z:schema>
+                let $schema2 := $property2/*
+                return
+                    element {node-name($property1)} {
+                        <js:allOf>{$schema1, $schema2}</js:allOf>                    
+                    }
+            ,
+            $constraint2Content[not(local-name(.) = $propertyNames1)]
+        )
+
+(:
     let $notCommonProperties := (
         $constraint1Content[not(local-name(.) = $propertyNames2)],
         $constraint2Content[not(local-name(.) = $propertyNames1)]        
@@ -387,6 +420,10 @@ declare function f:mergeAllOfConstraintPair_properties(
     return (
         $notCommonProperties,
         $commonProperties
+    )
+:)
+    return (
+        $properties
     )
 
 };        

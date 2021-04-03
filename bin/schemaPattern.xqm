@@ -132,9 +132,14 @@ declare function f:msgNodeName($schema as element(),
             
         default return f:msgNodeNameDerivedFromOperation($operationId, $uriPath, $httpMethod, $msgRole)
 
-    let $msgNodeName := 
-        if ($useArraySuffix and $schemaDescription?isArray eq 'true') then $msgNodeName || $arraySuffix
-        else $msgNodeName
+    let $msgNodeName :=
+        let $isArray := $schemaDescription?isArray eq 'true'
+        let $prefix := 
+            if (matches($msgNodeName, '^(opid|oppm):')) then ()
+            else if ($isArray) then 'nams:'
+            else 'name:'
+        let $suffix := if (not($isArray)) then () else 'Instances'
+        return $prefix || $msgNodeName || $suffix
     (: Add description entry: msgNodeName :)
     let $schemaDescription :=    
         if ($msgNodeName) then map:put($schemaDescription, 'msgNodeName', $msgNodeName)
@@ -169,12 +174,13 @@ declare function f:msgNodeNameDerivedFromOperation(
         as xs:string? {
     if (not($msgRole)) then () else        
     (
-    if ($operationId[. castable as xs:NCName]) then $operationId
-    else if ($uriPath) then 
+    if ($operationId[. castable as xs:NCName]) then 'opid:' || $operationId
+    else if ($uriPath) then
+        'oppm:' || (
         $uriPath 
         ! convert:encode-key(.) 
         ! name:pathToXMLName(.) 
-        || '-' || lower-case($httpMethod)
+        || '-' || lower-case($httpMethod))
     else ()
     ) ! concat(., '-', lower-case($msgRole))
 };        

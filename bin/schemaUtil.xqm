@@ -171,8 +171,9 @@ declare function f:schemaPattern($schema as element())
  :)
 declare function f:schemaKey($schema as element(), $options as map(*)?)
         as xs:string {    
-    let $name := f:schemaPattern($schema) ? name
-    return if ($name) then $name else
+    let $schemaPattern := f:schemaPattern($schema)
+    let $name := $schemaPattern ? name
+    return if ($name) then 'name:' || $name else
     
     let $normalized := f:cmpNormalizeSchema($schema, $options)
     let $key := f:schemaKeyForNormSchema($normalized)

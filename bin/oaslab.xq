@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-04-02T20:44:09.149+02:00 
+ : @version 2021-04-03T12:59:41.732+02:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -108,7 +108,7 @@ declare variable $toolScheme :=
       <param name="pathFilter" type="nameFilter?"/>
       <param name="methodFilter" type="nameFilter?"/>
       <param name="roleFilter" type="nameFilter?"/>
-      <param name="schemaKeyStyle" type="xs:string?" fct_values="path, pathname" default="path"/>
+      <param name="schemaKeyStyle" type="xs:string?" fct_values="path, pathname" default="pathname"/>
       <param name="odir" type="xs:string?"/>
       <param name="addSuffix" type="xs:string?"/>
       <param name="addPrefix" type="xs:string?"/>

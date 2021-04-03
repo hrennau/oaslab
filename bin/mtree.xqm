@@ -15,7 +15,7 @@
          <param name="pathFilter" type="nameFilter?"/>
          <param name="methodFilter" type="nameFilter?"/>
          <param name="roleFilter" type="nameFilter?"/>
-         <param name="schemaKeyStyle" type="xs:string?" fct_values="path, pathname" default="path"/>
+         <param name="schemaKeyStyle" type="xs:string?" fct_values="path, pathname" default="pathname"/>
          <param name="odir" type="xs:string?"/>
          <param name="addSuffix" type="xs:string?"/>
          <param name="addPrefix" type="xs:string?"/>
@@ -154,7 +154,7 @@ declare function f:mtree($oas as element()+,
             f:oasMsgTrees($doc, $options)
     return 
         if ($odir) then
-            $docReports ! util:writeFile(., base-uri(.) ! file:name(.) ! replace(., '\.json$', '.xml'), $options)
+            $docReports ! util:writeFile(., @sourceOAS ! file:name(.) ! replace(., '\.json$', '.xml'), $options)
         else
             <z:docs count="{count($docReports)}" 
                     xmlns:oas="http://www.oaslab.org/ns/oas"
@@ -301,7 +301,7 @@ declare function f:oasMsgObjectTree(
     let $schemaKeys := $oasTreeContent//@schemaKey
     let $countMsgUses := count($schemaKeys)    
     let $countMsgs := count($schemaKeys => distinct-values())
-    let $oasTree := <z:oas xml:base="{$oas/base-uri(.)}"
+    let $oasTree := <z:oas sourceOAS="{$oas/base-uri(.)}"
                            countMsgs="{$countMsgs}"
                            countMsgUses="{$countMsgUses}" 
     >{$oasTreeContent}</z:oas>
@@ -443,7 +443,7 @@ declare function f:mtreeOld($oas as element()+,
         let $countMsgUses := count($msgUses)
         let $countMsgs := count($msgUses/@schemaKey => distinct-values())
         return
-            <z:doc xml:base="{$doc/base-uri(.)}" 
+            <z:doc sourceOAS="{$doc/base-uri(.)}" 
                    countMsgs="{$countMsgs}" 
                    countMsgUses="{$countMsgUses}"
                    xmlns:oas="http://www.oaslab.org/ns/oas"
@@ -452,7 +452,7 @@ declare function f:mtreeOld($oas as element()+,
             }</z:doc>
     return 
         if ($odir) then
-            $docReports ! util:writeFile(., base-uri(.) ! file:name(.) ! replace(., '\.json$', '.xml'), $options)
+            $docReports ! util:writeFile(., @sourceOAS ! file:name(.) ! replace(., '\.json$', '.xml'), $options)
         else
             <z:docs count="{count($docReports)}" 
                     xmlns:oas="http://www.oaslab.org/ns/oas"
@@ -486,7 +486,7 @@ declare function f:stree($oas as element()+,
                     $tree
                 }</z:schema>
         return
-            <z:doc xml:base="{$doc/base-uri(.)}"
+            <z:doc sourceOAS="{$doc/base-uri(.)}"
                    xmlns:oas="http://www.oaslab.org/ns/oas"
                    xmlns:js="http://www.oaslab.org/ns/json-schema">{
                 $schemaReports

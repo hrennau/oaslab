@@ -31,16 +31,15 @@ declare function f:jname($node as node())
  : Writes a document into a file. The document is not necessarily
  : an XML node tree. 
  :
- : Parameter $sourceFileNameSource specifies a source file name
- : which is either retained or edited according to other parameters
- : taken from the options (addPrefix, addSuffix, fnameReplacement).
- : If the value is a string, it is treated as a file name or a URI
- : from which the file name is extracted. If the value is a node, 
- : the source file name is derived from the base URI of the node.
+ : Parameter $fileNameRaw specifies a source file name which is either 
+ : retained or edited according to other parameters taken from the 
+ : options (addPrefix, addSuffix, fnameReplacement). If the value is 
+ : a string, it is treated as a file name or a URI from which the file 
+ : name is extracted. If the value is a node, the source file name is 
+ : derived from the base URI of the node.
  :
- : When $sourceFileNameSource is not provided, the document must
- : be an XML node tree and the source file name is derived from 
- : its base URI. 
+ : When $fileNameRaw is not provided, the document must be an XML node tree 
+ : and the raw file name is derived from its base URI. 
  :
  : Options:
  : odir - target folder (mandatory!)
@@ -51,31 +50,31 @@ declare function f:jname($node as node())
  :     applied to the source file name; syntax: fromSubstring=toSubstring
  :  
  : @param doc the document to be written
- : @param sourceFileNameSource explicit specification of the source file 
- :     name either to be retained to edited
+ : @param fileNameRaw specifies the file name, optionally to be edited before 
+ :   use
  : @param options Options controlling the target file location.
  : @return empty sequence
  :)
 declare function f:writeFile($doc as item(),
-                             $sourceFileNameSource as item()?,
+                             $fileNameRaw as item()?,
                              $options as map(*))
         as empty-sequence() {
     let $odir := $options?odir
     return if (not($odir)) then () else
 
-    let $sourceFileName := 
-        if ($sourceFileNameSource) then
-            if ($sourceFileNameSource instance of node()) then $sourceFileNameSource/base-uri(.) ! file:name(.)
-            else $sourceFileNameSource ! file:name(.)
+    let $fileName := 
+        if ($fileNameRaw) then
+            if ($fileNameRaw instance of node()) then $fileNameRaw/base-uri(.) ! file:name(.)
+            else $fileNameRaw ! file:name(.)
         else if ($doc instance of node()) then 
             $doc/base-uri(.) ! file:name(.)
         else 
             error(QName((), 'INVALID_CALL'), "Non-node document requires explicit $sourceFilenName.")
-    let $targetFileName := 
-        f:editFileName($sourceFileName, 
+    let $fileNameFinal := 
+        f:editFileName($fileName, 
                        $options?addPrefix, $options?addSuffix, $options?fnameReplacement)
-    let $targetPath := $odir || '/' || $targetFileName
-    return file:write($targetPath, $doc)
+    let $filePath := $odir || '/' || $fileNameFinal
+    return file:write($filePath, $doc)
 };
 
 (:~
