@@ -355,26 +355,23 @@ declare function f:mergeAllOfConstraintsRC($n as node(),
     case document-node() return
         document {$n/node() ! f:mergeAllOfConstraintsRC(., $options)}
     case element(js:type) return
-        if (not($n/z:all)) then
-            element {node-name($n)} {
-                $n/@* ! f:mergeAllOfConstraintsRC(., $options),
-                $n/node() ! f:mergeAllOfConstraintsRC(., $options)
-            }
+        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options)
         else f:mergeAllOfConstraints_type($n)
                         
+    case element(js:minProperties) return
+        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options)
+        else f:mergeAllOfConstraints_minProperties($n)
+                        
+    case element(js:maxProperties) return
+        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options) 
+        else f:mergeAllOfConstraints_maxProperties($n)
+                        
     case element(z:required) return
-        if (not($n/z:all)) then
-            element {node-name($n)} {
-                $n/@* ! f:mergeAllOfConstraintsRC(., $options),
-                $n/node() ! f:mergeAllOfConstraintsRC(., $options)
-            }
+        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options)
         else f:mergeAllOfConstraints_required($n)
+        
     case element(js:properties) return
-        if (not($n/z:all)) then
-            element {node-name($n)} {
-                $n/@* ! f:mergeAllOfConstraintsRC(., $options),
-                $n/node() ! f:mergeAllOfConstraintsRC(., $options)
-            }
+        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options)
         else
             let $mergedProperties := fold-left($n/z:all/*, (), f:mergeAllOfConstraintPair_properties#2)
             (: Merged properties may contain an allOf keyword :) 
@@ -389,13 +386,24 @@ declare function f:mergeAllOfConstraintsRC($n as node(),
                 }
 
     case element() return
-        element {node-name($n)} {
-            $n/@* ! f:mergeAllOfConstraintsRC(., $options),
-            $n/node() ! f:mergeAllOfConstraintsRC(., $options)
-        }
+         f:mergeAllOfConstraints_copy($n, $options)
+         
     case text() return
         if ($n/../* and $n/not(matches(., '\S'))) then () else $n
     default return $n            
+};        
+
+(:~
+ : Helper function of `mergeAllOfConstraintsRC`.
+ :)
+declare function f:mergeAllOfConstraints_copy(
+                             $n as node(),
+                             $options as map(*)?)
+        as node()* {
+    element {node-name($n)} {
+        $n/@* ! f:mergeAllOfConstraintsRC(., $options),
+        $n/node() ! f:mergeAllOfConstraintsRC(., $options)
+    }
 };        
 
 declare function f:mergeAllOfConstraints_type($type as element(js:type))
@@ -414,11 +422,22 @@ declare function f:mergeAllOfConstraints_type($type as element(js:type))
 
 declare function f:mergeAllOfConstraints_required($type as element(z:required))
         as element()? {
-            (: ___TO_DO___ Not yet considered: possibility to have type arrays to be ANDed :)
     if ($type/z:all/z:constraint/z:value = 'true') then 
         <z:required>true</z:required>
     else
         <z:required>false</z:required>
+};
+
+declare function f:mergeAllOfConstraints_minProperties($minProperties as element(js:minProperties))
+        as element()? {
+    ($minProperties/z:all/z:constraint/z:value/xs:integer(.) => max())
+    ! <js:minProperties>{.}</js:minProperties>
+};
+
+declare function f:mergeAllOfConstraints_maxProperties($maxProperties as element(js:maxProperties))
+        as element()? {
+    ($maxProperties/z:all/z:constraint/z:value/xs:integer(.) => min()) 
+    ! <js:maxProperties>{.}</js:maxProperties>
 };
 
 declare function f:mergeAllOfConstraintPair_properties(
