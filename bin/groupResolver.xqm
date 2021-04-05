@@ -354,40 +354,20 @@ declare function f:mergeAllOfConstraintsRC($n as node(),
     typeswitch($n)
     case document-node() return
         document {$n/node() ! f:mergeAllOfConstraintsRC(., $options)}
-    case element(js:type) return
-        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options)
-        else f:mergeAllOfConstraints_type($n)
-                        
-    case element(js:minProperties) return
-        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options)
-        else f:mergeAllOfConstraints_minProperties($n)
-                        
-    case element(js:maxProperties) return
-        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options) 
-        else f:mergeAllOfConstraints_maxProperties($n)
-                        
-    case element(z:required) return
-        if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options)
-        else f:mergeAllOfConstraints_required($n)
-        
-    case element(js:properties) return
+    case element() return
         if (not($n/z:all)) then f:mergeAllOfConstraints_copy($n, $options)
         else
-            let $mergedProperties := fold-left($n/z:all/*, (), f:mergeAllOfConstraintPair_properties#2)
-            (: Merged properties may contain an allOf keyword :) 
-            let $mergedResolved :=
-                for $property in $mergedProperties
-                return
-                    if (not($property/z:allOf)) then $property
-                    else $property/z:allOf/f:resolveAllOf(., $options)
-            return
-                element {node-name($n)} {
-                    $mergedResolved
-                }
-
-    case element() return
-         f:mergeAllOfConstraints_copy($n, $options)
-         
+            typeswitch($n)
+            case element(js:description) return f:mergeAllOfConstraints_description($n)            
+            case element(js:enum) return f:mergeAllOfConstraints_enum($n)            
+            case element(js:minItems) return f:mergeAllOfConstraints_minItems($n)            
+            case element(js:minProperties) return f:mergeAllOfConstraints_minProperties($n)
+            case element(js:maxItems) return f:mergeAllOfConstraints_maxItems($n)            
+            case element(js:maxProperties) return f:mergeAllOfConstraints_maxProperties($n)
+            case element(js:properties) return f:mergeAllOfConstraints_properties($n)
+            case element(z:required) return f:mergeAllOfConstraints_required($n)            
+            case element(js:type) return f:mergeAllOfConstraints_type($n)            
+            default return f:mergeAllOfConstraints_copy($n, $options)
     case text() return
         if ($n/../* and $n/not(matches(., '\S'))) then () else $n
     default return $n            
@@ -406,6 +386,83 @@ declare function f:mergeAllOfConstraints_copy(
     }
 };        
 
+(: 
+ : ===================================================================================
+ :
+ :     C o m b i n e    k e y w o r d    c o n t e n t s
+ :
+ : =================================================================================== 
+ :)
+
+declare function f:mergeAllOfConstraints_description($description as element(js:description))
+        as element()? {
+    element {node-name($description)} {        
+        (
+        for $item at $pos in $description/z:all/z:constraint/z:value
+        return '(' || $pos || ') ' || $item
+        )
+        => string-join('&#xA;')
+    }        
+};
+
+declare function f:mergeAllOfConstraints_enum($enum as element(js:enum))
+        as element()? {
+    element {node-name($enum)} {        
+        (
+        $enum/z:all/z:constraint/z:enumValue => distinct-values() 
+        )
+        ! <z:enumValue>.</z:enumValue>
+    }        
+};
+
+declare function f:mergeAllOfConstraints_minItems($minItems as element(js:minItems))
+        as element()? {
+    ($minItems/z:all/z:constraint/z:value/xs:integer(.) => max())
+    ! <js:minItems>{.}</js:minItems>
+};
+
+declare function f:mergeAllOfConstraints_minProperties($minProperties as element(js:minProperties))
+        as element()? {
+    ($minProperties/z:all/z:constraint/z:value/xs:integer(.) => max())
+    ! <js:minProperties>{.}</js:minProperties>
+};
+
+declare function f:mergeAllOfConstraints_maxItems($maxItems as element(js:maxItems))
+        as element()? {
+    ($maxItems/z:all/z:constraint/z:value/xs:integer(.) => min()) 
+    ! <js:maxItems>{.}</js:maxItems>
+};
+
+declare function f:mergeAllOfConstraints_maxProperties($maxProperties as element(js:maxProperties))
+        as element()? {
+    ($maxProperties/z:all/z:constraint/z:value/xs:integer(.) => min()) 
+    ! <js:maxProperties>{.}</js:maxProperties>
+};
+
+declare function f:mergeAllOfConstraints_properties($properties as element(js:properties))
+        as element(js:properties) {
+    let $mergedProperties := 
+        fold-left($properties/z:all/*, (), f:mergeAllOfConstraintPair_properties#2)
+    (: Merged properties may contain an allOf keyword :) 
+    let $mergedResolved :=
+        for $property in $mergedProperties
+        return
+            if (not($property/z:allOf)) then $property
+            else $property/z:allOf/f:resolveAllOf(., ())
+    return
+        element {node-name($properties)} {
+            $mergedResolved
+        }
+};
+
+declare function f:mergeAllOfConstraints_required($type as element(z:required))
+        as element()? {
+    if ($type/z:all/z:constraint/z:value = 'true') then 
+        <z:required>true</z:required>
+    else
+        <z:required>false</z:required>
+};
+
 declare function f:mergeAllOfConstraints_type($type as element(js:type))
         as element()? {
             (: ___TO_DO___ Not yet considered: possibility to have type arrays to be ANDed :)
@@ -418,26 +475,6 @@ declare function f:mergeAllOfConstraints_type($type as element(js:type))
                 ($types2/tokenize(., '\|') => distinct-values() => sort())
                 ! <_>.</_>}</type>
         else ()                
-};
-
-declare function f:mergeAllOfConstraints_required($type as element(z:required))
-        as element()? {
-    if ($type/z:all/z:constraint/z:value = 'true') then 
-        <z:required>true</z:required>
-    else
-        <z:required>false</z:required>
-};
-
-declare function f:mergeAllOfConstraints_minProperties($minProperties as element(js:minProperties))
-        as element()? {
-    ($minProperties/z:all/z:constraint/z:value/xs:integer(.) => max())
-    ! <js:minProperties>{.}</js:minProperties>
-};
-
-declare function f:mergeAllOfConstraints_maxProperties($maxProperties as element(js:maxProperties))
-        as element()? {
-    ($maxProperties/z:all/z:constraint/z:value/xs:integer(.) => min()) 
-    ! <js:maxProperties>{.}</js:maxProperties>
 };
 
 declare function f:mergeAllOfConstraintPair_properties(
@@ -479,39 +516,7 @@ declare function f:mergeAllOfConstraintPair_properties(
             ,
             $constraint2Content[not(local-name(.) = $propertyNames1)]
         )
-
-(:
-    let $notCommonProperties := (
-        $constraint1Content[not(local-name(.) = $propertyNames2)],
-        $constraint2Content[not(local-name(.) = $propertyNames1)]        
-    )
-    let $commonProperties :=
-        for $property1 in $constraint1Content[local-name(.) = $propertyNames2]
-        let $property2 := $constraint2Content[local-name(.) eq $property1/local-name(.)]
-        
-        let $schema1 :=
-            if ($property1/js:allOf) then $property1/js:allOf/*
-            else
-                <z:schema>{
-                    $property1/* ! f:mergeAllOfConstraintsRC(., ()) 
-                }</z:schema>
-        let $schema2 := 
-            <z:schema>{
-                $property2/* ! f:mergeAllOfConstraintsRC(., ())
-            }</z:schema>
-        return
-            element {node-name($property1)} {
-                <js:allOf>{
-                    $schema1, $schema2
-                }</js:allOf>
-            }
-    return (
-        $notCommonProperties,
-        $commonProperties
-    )
-:)
     return (
         $properties
     )
-
 };        
