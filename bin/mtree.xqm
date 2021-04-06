@@ -20,6 +20,7 @@
          <param name="addSuffix" type="xs:string?"/>
          <param name="addPrefix" type="xs:string?"/>
          <param name="fnameReplacement" type="xs:string?"/>
+         <param name="ostage" type="xs:integer?"/>
       </operation>
       <operation name="stree" type="item()?" func="streeOP">     
          <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
@@ -30,6 +31,7 @@
          <param name="addSuffix" type="xs:string?"/>
          <param name="addPrefix" type="xs:string?"/>
          <param name="fnameReplacement" type="xs:string?"/>
+         <param name="ostage" type="xs:integer?"/>         
       </operation>
       
     </operations>  
@@ -80,6 +82,7 @@ declare function f:mtreeOP($request as element())
     let $addSuffix := tt:getParam($request, 'addSuffix')
     let $addPrefix := tt:getParam($request, 'addPrefix')
     let $fnameReplacement := tt:getParam($request, 'fnameReplacement')
+    let $ostage := tt:getParam($request, 'ostage')    
     
     let $pathFilter := tt:getParam($request, 'pathFilter')
     let $methodFilter := tt:getParam($request, 'methodFilter')
@@ -95,7 +98,8 @@ declare function f:mtreeOP($request as element())
         $fnameReplacement ! map:entry('fnameReplacement', .),
         $pathFilter ! map:entry('pathFilter', .),
         $methodFilter ! map:entry('methodFilter', .),      
-        $roleFilter ! map:entry('roleFilter', .)
+        $roleFilter ! map:entry('roleFilter', .),
+        $ostage ! map:entry('ostage', .)        
     ))
     return
         f:mtree($oas, $options)

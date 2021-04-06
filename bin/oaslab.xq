@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-04-03T12:59:41.732+02:00 
+ : @version 2021-04-05T18:33:49.379+02:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -113,6 +113,7 @@ declare variable $toolScheme :=
       <param name="addSuffix" type="xs:string?"/>
       <param name="addPrefix" type="xs:string?"/>
       <param name="fnameReplacement" type="xs:string?"/>
+      <param name="ostage" type="xs:integer?"/>
     </operation>
     <operation name="stree" type="item()?" func="streeOP" mod="mtree.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/mtree">
       <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
@@ -123,6 +124,7 @@ declare variable $toolScheme :=
       <param name="addSuffix" type="xs:string?"/>
       <param name="addPrefix" type="xs:string?"/>
       <param name="fnameReplacement" type="xs:string?"/>
+      <param name="ostage" type="xs:integer?"/>
     </operation>
     <operation name="prune" type="item()?" func="pruneOP" mod="prune.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/prune">
       <param name="oas" type="jsonFOX" fct_minDocCount="1"/>

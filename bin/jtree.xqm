@@ -39,6 +39,8 @@ declare namespace js="http://www.oaslab.org/ns/json-schema";
 declare function f:jtree($schema as element(),
                          $options as map(*)?)
         as item()* {
+    let $ostage := $options?ostage
+    
     let $flat := $options?flat
     let $bare := $options?bare
     let $tree01 := $schema ! f:jtree01RC(., $flat, 'schema', ())
@@ -49,7 +51,15 @@ declare function f:jtree($schema as element(),
     let $tree05 := 
         if (not($bare)) then $tree04
         else $tree04 ! f:jtreeBareRC(., $flat, 'schema', ())
-    return $tree05
+    return 
+        if (empty($ostage)) then $tree05
+        else
+            switch($ostage)
+            case 1 return $tree01
+            case 2 return $tree02
+            case 3 return $tree03
+            case 4 return $tree04
+            default return $tree05
 };
 
 (:~
@@ -323,21 +333,23 @@ declare function f:jtreePruneRC(
     typeswitch($n)
     
     case element(z:schema) return
-        let $nextElem :=
-            if ($n/(not(@*) and count(*) eq 1 and z:schema)) then $n/z:schema
+        let $nextElem := 
+            if ($n/@*) then $n
+            else if ($n[count(*) eq 1]/z:schema) then $n/z:schema 
             else $n
-        return $nextElem ! f:jtreePrune_copy(., $flat, 'schema', (), $newVisited)
+        return $nextElem ! f:jtreePrune_copy(., $flat, (), (), $newVisited)
 
     case element(js:allOf) | element(js:oneOf) | element(js:anyOf) return
         (: Single child :)
         if (count($n/*) eq 1) then
             let $nextElem :=
-                if ($n/*/(not(@*) and count(*) eq 1 and z:schema)) then $n/*/*
+                if ($n/z:schema[not(@*)]) then $n/z:schema/*
                 else $n/*
-            return $nextElem ! f:jtreePrune_copy(., $flat, 'schema', (), $newVisited)
+            return
+                $nextElem ! f:jtreePrune_copy(., $flat, 'schema', (), $newVisited)
         (: Multiple children :)
         else 
-            $n ! f:jtreePrune_copy(., $flat, $n/local-name(.), (), $newVisited)
+            $n ! f:jtreePrune_copy(., $flat, (), (), $newVisited)
         
     case element() return
         $n ! f:jtreePrune_copy(., $flat, $n/local-name(.), (), $newVisited)    

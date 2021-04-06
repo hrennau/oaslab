@@ -145,10 +145,16 @@ declare function f:normalizeAllOf1RC($n as node(),
     case document-node() return
         document {$n/node() ! f:normalizeAllOf1RC(., $options)}
         
+    case element(z:oas) return 
+        element {node-name($n)} {
+            attribute xml:base {$n/base-uri(.)}[not($n/parent::*)],
+            $n/@* !  f:normalizeAllOf1RC(., $options),
+            $n/node() ! f:normalizeAllOf1RC(., $options)        
+        }
+    
     case element() return
         if (not($n/js:allOf/(preceding-sibling::*, following-sibling::*))) then
             element {node-name($n)} {
-                attribute xml:base {$n/base-uri(.)}[not($n/parent::*)],
                 $n/@* !  f:normalizeAllOf1RC(., $options),
                 $n/node() ! f:normalizeAllOf1RC(., $options)        
             }
@@ -360,12 +366,15 @@ declare function f:mergeAllOfConstraintsRC($n as node(),
             typeswitch($n)
             case element(js:description) return f:mergeAllOfConstraints_description($n)            
             case element(js:enum) return f:mergeAllOfConstraints_enum($n)            
+            case element(js:format) return f:mergeAllOfConstraints_format($n)
+            case element(js:items) return f:mergeAllOfConstraints_items($n)            
             case element(js:minItems) return f:mergeAllOfConstraints_minItems($n)            
             case element(js:minProperties) return f:mergeAllOfConstraints_minProperties($n)
             case element(js:maxItems) return f:mergeAllOfConstraints_maxItems($n)            
             case element(js:maxProperties) return f:mergeAllOfConstraints_maxProperties($n)
             case element(js:properties) return f:mergeAllOfConstraints_properties($n)
             case element(z:required) return f:mergeAllOfConstraints_required($n)            
+            case element(z:schema) return f:mergeAllOfConstraints_schema($n)            
             case element(js:type) return f:mergeAllOfConstraints_type($n)            
             default return f:mergeAllOfConstraints_copy($n, $options)
     case text() return
@@ -405,6 +414,20 @@ declare function f:mergeAllOfConstraints_description($description as element(js:
     }        
 };
 
+declare function f:mergeAllOfConstraints_format($format as element(js:format))
+        as element()? {
+    element {node-name($format)} {        
+        let $formats := $format/z:all/z:constraint/z:value => distinct-values()
+        return
+            if (count($formats) eq 1) then text {$formats}
+            else
+                <z:all>{
+                    for $format in $formats
+                    return <z:constraint><z:value>{$format}</z:value></z:constraint>
+                }</z:all>
+    }
+};
+
 declare function f:mergeAllOfConstraints_enum($enum as element(js:enum))
         as element()? {
     element {node-name($enum)} {        
@@ -413,6 +436,14 @@ declare function f:mergeAllOfConstraints_enum($enum as element(js:enum))
         )
         ! <z:enumValue>.</z:enumValue>
     }        
+};
+
+declare function f:mergeAllOfConstraints_items($items as element(js:items))
+        as element()? {
+    let $subschemas := $items/z:all/z:constraint/<z:schema>{node()}</z:schema>        
+    let $allOfSchema := element {node-name($items)} {<js:allOf>{$subschemas}</js:allOf>}
+    return
+        f:resolveAllOf($allOfSchema, ())
 };
 
 declare function f:mergeAllOfConstraints_minItems($minItems as element(js:minItems))
@@ -463,17 +494,33 @@ declare function f:mergeAllOfConstraints_required($type as element(z:required))
         <z:required>false</z:required>
 };
 
+declare function f:mergeAllOfConstraints_schema($schema as element())
+        as element()* {
+    let $subschemasRaw := $schema/z:all/z:constraint/<z:schema>{@*, node()}</z:schema>
+    (: Remove duplicate schemas :)
+    let $subschemas :=
+        for $subschema at $pos in $subschemasRaw
+        group by $subschemaName := ($subschema/@name, $pos)[1]
+        return $subschema[1]
+    let $allOfSchema :=
+        <z:schema><js:allOf>{$subschemas}</js:allOf></z:schema>
+    (: let $_DEBUG := file:write('DEBUG_ALL_OF_SCHEMA.xml', $allOfSchema) :)
+    let $resolved := f:resolveAllOf($allOfSchema, ())        
+    return $resolved/*
+        (: <z:schema>{$resolved}</z:schema> , '___SCHEMA: ') :)
+};
+
 declare function f:mergeAllOfConstraints_type($type as element(js:type))
         as element()? {
             (: ___TO_DO___ Not yet considered: possibility to have type arrays to be ANDed :)
     let $types1 := $type/z:all/z:constraint/z:value => distinct-values()
     let $types2 := $type/z:all/z:constraint/_ => sort() => string-join('|')
     return
-        if ($types1) then <type>{$types1[1]}</type>
+        if ($types1) then <js:type>{$types1[1]}</js:type>
         else if ($types2) then 
-            <type type="array">{
+            <js:type type="array">{
                 ($types2/tokenize(., '\|') => distinct-values() => sort())
-                ! <_>.</_>}</type>
+                ! <_>.</_>}</js:type>
         else ()                
 };
 
@@ -501,7 +548,7 @@ declare function f:mergeAllOfConstraintPair_properties(
                         if ($property1/js:allOf) then $property1/js:allOf/*
                         else
                             <z:schema>{
-                                $property1/* ! f:mergeAllOfConstraintsRC(., ()) 
+                                $property1/* (: ! f:mergeAllOfConstraintsRC(., ()) :) 
                             }</z:schema>
                     let $schema2 := 
                         <z:schema>{
@@ -512,6 +559,10 @@ declare function f:mergeAllOfConstraintPair_properties(
                             <js:allOf>{$schema1, $schema2}</js:allOf>                    
                         }
                 let $allOfResolved := $allOf ! f:resolveAllOf($allOf, ())
+                
+                let $_DEBUG := if (not($property1/local-name(.) eq 'supplier')) then () else file:write('DEBUG_ALL_OF_SUPPLIER_ELEM1.xml', $allOf)
+                let $_DEBUG := if (not($property1/local-name(.) eq 'supplier')) then () else file:write('DEBUG_ALL_OF_SUPPLIER_ELEM2.xml', $allOfResolved)
+                
                 return $allOfResolved
             ,
             $constraint2Content[not(local-name(.) = $propertyNames1)]
