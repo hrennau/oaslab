@@ -1,14 +1,14 @@
 (:
  : -------------------------------------------------------------------------
  :
- : groupResolver.xqm - functions resolving JSON Schema groups (allOf, oneOf, anyOf)
+ : allOfResolver.xqm - functions resolving JSON Schema groups, kind 'allOf'
  :
  : -------------------------------------------------------------------------
  :)
  
 (:~@operations
    <operations>
-      <operation name="resolveGroups" type="item()?" func="resolveGroupsOP">     
+      <operation name="resolveAllOf" type="item()?" func="resolveAllOfOP">     
          <param name="mtree" type="docFOX" fct_minDocCount="1"/>
          <param name="odir" type="xs:string?"/>
          <param name="addSuffix" type="xs:string?"/>
@@ -19,7 +19,7 @@
     </operations>  
 :)  
  
-module namespace f="http://www.oaslab.org/ns/xquery-functions/group";
+module namespace f="http://www.oaslab.org/ns/xquery-functions/allOf";
 
 import module namespace tt="http://www.ttools.org/xquery-functions" 
 at "tt/_nameFilter.xqm",
@@ -36,12 +36,12 @@ declare namespace oas="http://www.oaslab.org/ns/oas";
 declare namespace js="http://www.oaslab.org/ns/json-schema";
 
 (:~
- : Implements the operation 'mtree'. See function `mtree` for details.
+ : Implements the operation 'resolveAllOf'. See function `allOfResolver` for details.
  :
  : @param request the operation request with its input parameters
  : @return a report about JSON Schema references used in the input documents
  :) 
-declare function f:resolveGroupsOP($request as element())
+declare function f:resolveAllOfOP($request as element())
         as item()? {
     let $mtree := tt:getParam($request, 'mtree')/*
     let $odir := tt:getParam($request, 'odir')
@@ -58,17 +58,18 @@ declare function f:resolveGroupsOP($request as element())
         $ostage ! map:entry('ostage', .)        
     ))
     return
-        f:groupResolver($mtree, $options)
+        f:jtreeAllOf($mtree, $options)
 };
 
 (:~
- : Implements the operation 'mtree'. See function `mtree` for details.
+ : Transforms JSON Schema model trees by resolving all allOf groups.
  :
- : @param request the operation request with its input parameters
- : @return a report about JSON Schema references used in the input documents
+ : @param mtrees JSON Schema model trees
+ : @param options options controlling function execution
+ : @return the transformed model trees
  :) 
-declare function f:groupResolver($mtrees as element()+,
-                                 $options as map(*)?)
+declare function f:jtreeAllOf($mtrees as element()+,
+                              $options as map(*)?)
         as item()? {
     let $odir := $options?odir        
     let $docs :=
@@ -598,8 +599,8 @@ declare function f:mergeAllOfConstraints_type($type as element(js:type))
     let $types1 := $type/z:all/z:constraint/z:value => distinct-values()
     let $types2 := $type/z:all/z:constraint/_ => sort() => string-join('|')
     return
-        if ($types1) then <js:type>{$types1[1]}</js:type>
-        else if ($types2) then 
+        if (exists($types1)) then <js:type>{$types1[1]}</js:type>
+        else if (exists($types2)) then 
             <js:type type="array">{
                 ($types2/tokenize(., '\|') => distinct-values() => sort())
                 ! <_>.</_>}</js:type>
@@ -654,12 +655,29 @@ declare function f:mergeAllOfConstraintPair_properties(
     )
 };        
 
+(:~
+ : Attempts to merge the constraints of a `z:all` set of constraints.
+ : Strategy: if all constraints are deep-equal, the `z:all` set is 
+ : replaced with the content of the first constraint. Otherwise,
+ : the `z:all` set is retained.
+ : 
+ : @param other a keyword containing a `z:all` set of constraints
+ : @return the result of merging the constraints, or a copy of them
+ :)
 declare function f:mergeAllOfConstraints_other($other as element(), $options as map(*)?)
         as element()? {
+(: Earlier version:
+
     let $values := $other/z:all/z:constraint/z:value => distinct-values()
     return
-        if (count($values) eq 1) then 
-            element {node-name($other)} {$values}
-        else
-            f:mergeAllOfConstraints_copy($other, $options)
+        if (count($values) eq 1) then element {node-name($other)} {$values}
+        else f:mergeAllOfConstraints_copy($other, $options)
+:)
+    let $constraints := $other/z:all/z:constraint
+    let $uniform :=
+        every $index in 2 to count($constraints) satisfies
+            deep-equal($constraints[$index - 1], $constraints[$index])
+    return
+        if ($uniform) then element {node-name($other)} {$other/z:all/z:constraint[1]/node()}
+        else f:mergeAllOfConstraints_copy($other, $options)
 };            

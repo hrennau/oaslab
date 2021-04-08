@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-04-05T18:33:49.379+02:00 
+ : @version 2021-04-08T19:54:11.294+02:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -13,8 +13,8 @@ import module namespace tt="http://www.ttools.org/xquery-functions" at
 import module namespace a6="http://www.oaslab.org/ns/xquery-functions" at
     "spec.xqm";
 
-import module namespace a1="http://www.oaslab.org/ns/xquery-functions/group" at
-    "groupResolver.xqm";
+import module namespace a1="http://www.oaslab.org/ns/xquery-functions/allOf" at
+    "allOfResolver.xqm";
 
 import module namespace a5="http://www.oaslab.org/ns/xquery-functions/jtree" at
     "schemaGroup.xqm";
@@ -93,7 +93,7 @@ declare variable $toolScheme :=
     <operation name="_nodlSample" type="node()" func="nodlSample" mod="tt/_pcollection.xqm" namespace="http://www.ttools.org/xquery-functions">
       <param name="model" type="xs:string?" fct_values="xml, sql, mongo" default="xml"/>
     </operation>
-    <operation name="resolveGroups" type="item()?" func="resolveGroupsOP" mod="groupResolver.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/group">
+    <operation name="resolveAllOf" type="item()?" func="resolveAllOfOP" mod="allOfResolver.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/allOf">
       <param name="mtree" type="docFOX" fct_minDocCount="1"/>
       <param name="odir" type="xs:string?"/>
       <param name="addSuffix" type="xs:string?"/>
@@ -105,6 +105,7 @@ declare variable $toolScheme :=
       <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
       <param name="flat" type="xs:boolean?" default="false"/>
       <param name="bare" type="xs:boolean?"/>
+      <param name="lean" type="xs:boolean?"/>
       <param name="pathFilter" type="nameFilter?"/>
       <param name="methodFilter" type="nameFilter?"/>
       <param name="roleFilter" type="nameFilter?"/>
@@ -119,6 +120,7 @@ declare variable $toolScheme :=
       <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
       <param name="flat" type="xs:boolean?" default="false"/>
       <param name="bare" type="xs:boolean?"/>
+      <param name="lean" type="xs:boolean?"/>
       <param name="nameFilter" type="nameFilter?"/>
       <param name="odir" type="xs:string?"/>
       <param name="addSuffix" type="xs:string?"/>
@@ -304,14 +306,14 @@ declare function m:execOperation__nodlSample($request as element())
 };
      
 (:~
- : Executes operation 'resolveGroups'.
+ : Executes operation 'resolveAllOf'.
  :
  : @param request the request element
  : @return the operation result
  :)
-declare function m:execOperation_resolveGroups($request as element())
+declare function m:execOperation_resolveAllOf($request as element())
         as item()? {
-    a1:resolveGroupsOP($request)        
+    a1:resolveAllOfOP($request)        
 };
      
 (:~
@@ -415,7 +417,7 @@ declare function m:execOperation($req as element())
         else if ($opName eq '_copyNcat') then m:execOperation__copyNcat($req)
         else if ($opName eq '_deleteNcat') then m:execOperation__deleteNcat($req)
         else if ($opName eq '_nodlSample') then m:execOperation__nodlSample($req)
-        else if ($opName eq 'resolveGroups') then m:execOperation_resolveGroups($req)
+        else if ($opName eq 'resolveAllOf') then m:execOperation_resolveAllOf($req)
         else if ($opName eq 'mtree') then m:execOperation_mtree($req)
         else if ($opName eq 'stree') then m:execOperation_stree($req)
         else if ($opName eq 'prune') then m:execOperation_prune($req)

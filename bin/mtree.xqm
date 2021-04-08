@@ -12,6 +12,7 @@
          <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
          <param name="flat" type="xs:boolean?" default="false"/>
          <param name="bare" type="xs:boolean?"/>         
+         <param name="lean" type="xs:boolean?"/>
          <param name="pathFilter" type="nameFilter?"/>
          <param name="methodFilter" type="nameFilter?"/>
          <param name="roleFilter" type="nameFilter?"/>
@@ -25,7 +26,8 @@
       <operation name="stree" type="item()?" func="streeOP">     
          <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
          <param name="flat" type="xs:boolean?" default="false"/>
-         <param name="bare" type="xs:boolean?"/>         
+         <param name="bare" type="xs:boolean?"/>
+         <param name="lean" type="xs:boolean?"/>         
          <param name="nameFilter" type="nameFilter?"/>
          <param name="odir" type="xs:string?"/>
          <param name="addSuffix" type="xs:string?"/>
@@ -78,6 +80,7 @@ declare function f:mtreeOP($request as element())
     let $flat := tt:getParam($request, 'flat')
     let $schemaKeyStyle := tt:getParam($request, 'schemaKeyStyle')    
     let $bare := tt:getParam($request, 'bare')
+    let $lean := tt:getParam($request, 'lean')
     let $odir := tt:getParam($request, 'odir')
     let $addSuffix := tt:getParam($request, 'addSuffix')
     let $addPrefix := tt:getParam($request, 'addPrefix')
@@ -92,6 +95,7 @@ declare function f:mtreeOP($request as element())
         $flat ! map:entry('flat', .),
         $schemaKeyStyle ! map:entry('schemaKeyStyle', .),        
         $bare ! map:entry('bare', .), 
+        $lean ! map:entry('lean', .),
         $odir ! map:entry('odir', .),
         $addSuffix ! map:entry('addSuffix', .),
         $addPrefix ! map:entry('addPrefix', .),
@@ -116,6 +120,7 @@ declare function f:streeOP($request as element())
     let $oas := tt:getParam($request, 'oas')/*
     let $flat := tt:getParam($request, 'flat')
     let $bare := tt:getParam($request, 'bare')    
+    let $lean := tt:getParam($request, 'lean')
     let $odir := tt:getParam($request, 'odir')
     let $addSuffix := tt:getParam($request, 'addSuffix')
     let $addPrefix := tt:getParam($request, 'addPrefix')
@@ -126,6 +131,7 @@ declare function f:streeOP($request as element())
     let $options := map:merge((
         $flat ! map:entry('flat', .),
         $bare ! map:entry('bare', .),        
+        $lean ! map:entry('lean', .),
         $odir ! map:entry('odir', .),
         $addSuffix ! map:entry('addSuffix', .),
         $addPrefix ! map:entry('addPrefix', .),
@@ -178,6 +184,7 @@ declare function f:oasMsgTrees($oas as element(),
         as element() {
     let $bare := $options?bare
     let $optionsOasMsgObjectTree := map:put($options, 'withSchemaDict', not($bare))    
+    let $optionsOasMsgObjectTree := map:put($options, 'withSchemaDict', true())
     let $treeAndSchemaDict := f:oasMsgObjectTree($oas, $optionsOasMsgObjectTree)        
     let $tree := 
         <z:msgObjectTree>{

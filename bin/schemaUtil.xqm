@@ -97,6 +97,7 @@ declare function f:getJsContext($node as node(), $parentJsContext as xs:string)
        but by the parent context :)
     switch($parentJsContext)
     case 'properties' return 'property-schema'
+    case 'default' return 'default-value'
     case 'enum' return 'enum-value'
     case 'enum-value' return 'enum-value'
     case 'example' return 'example-content'

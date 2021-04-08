@@ -14,6 +14,9 @@ at "tt/_nameFilter.xqm";
 import module namespace foxf="http://www.foxpath.org/ns/fox-functions" 
 at "tt/_foxpath-fox-functions.xqm";    
 
+import module namespace all="http://www.oaslab.org/ns/xquery-functions/allOf" 
+at "allOfResolver.xqm";    
+
 import module namespace ref="http://www.oaslab.org/ns/xquery-functions/ref" 
 at "ref.xqm";    
 
@@ -42,24 +45,27 @@ declare function f:jtree($schema as element(),
     let $ostage := $options?ostage
     
     let $flat := $options?flat
-    let $bare := $options?bare
+    let $lean := $options?lean
     let $tree01 := $schema ! f:jtree01RC(., $flat, 'schema', ())
-    let $tree02 := $tree01 ! f:jtreePropertyAttsRC(., $flat, 'schema', ())
     let $tree02 := $tree01 (: Switch off the shifting of property details into details :)
     let $tree03 := $tree02 ! f:jtreeRequiredRC(., $flat, 'schema', ())
     let $tree04 := $tree03 ! f:jtreePruneRC(., $flat, 'schema', ())
-    let $tree05 := 
-        if (not($bare)) then $tree04
-        else $tree04 ! f:jtreeBareRC(., $flat, 'schema', ())
+    let $tree05 := $tree04 ! all:jtreeAllOf(., ())
+    let $tree06 := $tree05 ! f:jtreePropertyAttsRC(., $flat, 'schema', ())
+    let $tree07 := 
+        if (not($lean)) then $tree06
+        else $tree06 ! f:jtreeLeanRC(., $flat, 'schema', ())
     return 
-        if (empty($ostage)) then $tree05
+        if (empty($ostage)) then $tree07
         else
             switch($ostage)
             case 1 return $tree01
             case 2 return $tree02
             case 3 return $tree03
             case 4 return $tree04
-            default return $tree05
+            case 5 return $tree05
+            case 6 return $tree06
+            default return $tree07
 };
 
 (:~
@@ -198,8 +204,8 @@ declare function f:jtree01RC_old($n as node(),
 (:~
  : Recursive helper function of `jtree`.
  :
- : Applied to tree01. Makes properties more compact, turning divers child elements
- : into attributes: 
+ : Applied to a JSON Schema model tree. Makes properties more compact, 
+ : turning divers child elements into attributes: 
  :   type, format, pattern, nullable,
  :   minLength, maxLength, minimum, maximum, minItems, maxItems 
  :
@@ -230,13 +236,24 @@ declare function f:jtreePropertyAttsRC(
          | element(js:minItems)
          | element(js:maxItems)
          | element(js:nullable)
+         | element(z:added)
+         | element(z:required)
          return
         attribute {local-name($n)} {$n}
         
+    case element(js:xml) return
+        for $child in $n/*
+        let $attName := 'xml.' || $child/local-name(.)
+        return attribute {$attName} {$n}
+        
+    case element(js:default) return
+        if ($n/*) then 
+            let $newSchemaContext := shut:getJsContext($n, $schemaContext)
+            return f:jtreePropertyAtts_copy($n, $flat, $newSchemaContext, (), $newVisited)
+        else $n/attribute {local-name(.)} {.}
+        
     case element() return
-        let $newSchemaContext := 
-            if ($n/parent::js:properties) then 'property-schema'
-            else local-name($n)
+        let $newSchemaContext := shut:getJsContext($n, $schemaContext)
         return
             f:jtreePropertyAtts_copy($n, $flat, $newSchemaContext, (), $newVisited)
 
@@ -360,9 +377,10 @@ declare function f:jtreePruneRC(
 (:~
  : Recursive helper function of `jtree`.
  :
- : Applied to tree03. Removes unnecessary structure:
- : - a <schema> without attributes and a single <schema> child is removed
- : - an <allOf>, <oneOf>, <anyOf> with a single child is replaced by the child
+ : Edits a JSON Schema model. Removes unnecessary structure:
+ : - removes `description`, `example`, `title`
+ : - unwraps the contents of `properties` keywords
+ : - unwraps the contents of `schema` elements
  :
  : @param n the node to be preocessed
  : @param flat if true, references are not expanded
@@ -370,7 +388,7 @@ declare function f:jtreePruneRC(
  : @param visited nodes already visited
  : @return the processed input node
  :)
-declare function f:jtreeBareRC($n as node(), 
+declare function f:jtreeLeanRC($n as node(), 
                                $flat as xs:boolean?,
                                $schemaContext as xs:string?,
                                $visited as node()*)
@@ -385,8 +403,11 @@ declare function f:jtreeBareRC($n as node(),
          | element(js:title)
          return ()
          
+    case element(js:enum) return
+        attribute {local-name($n)} {$n/* => string-join(', ')}
+        
     case element(js:properties) return
-        $n/* ! f:jtreeBare_copy(., $flat, 'property-schema', (), $newVisited)
+        $n/* ! f:jtreeLean_copy(., $flat, 'property-schema', (), $newVisited)
        
     (: The contents of "items" are unwrapped, "items" vanishes:
        items/@type becomes @itemType;
@@ -395,25 +416,25 @@ declare function f:jtreeBareRC($n as node(),
          still be clarified if this can cause problems and
          imply a significant loss of information
      :)
-    case element(js:items) return (
+    case element(js:itemsXXX) return (
         $n/@type ! attribute itemType {.},
-        $n/(@* except @type) ! f:jtreeBareRC(., $flat, 'item-schema', $newVisited),
+        $n/(@* except @type) ! f:jtreeLeanRC(., $flat, 'item-schema', $newVisited),
         let $nextElems :=
             if ($n/(z:schema and count(*) eq 1)) then $n/z:schema/*
             else $n/*
         return
-            $nextElems ! f:jtreeBareRC(., $flat, 'item-schema', $newVisited)
+            $nextElems ! f:jtreeLeanRC(., $flat, 'item-schema', $newVisited)
     )
     
     case element(z:schema) return
-        if ($n/@name and $schemaContext eq 'property-schema') then (
+        if ($n/@name and $schemaContext = ('property-schema', 'items')) then (
             $n/@name ! attribute schemaName {.},
-            $n/* ! f:jtreeBareRC(., $flat, local-name(.), $newVisited)
+            $n/* ! f:jtreeLeanRC(., $flat, local-name(.), $newVisited)
         ) else
-            $n ! f:jtreeBare_copy(., $flat, $n/local-name(.), (), $newVisited)
+            $n ! f:jtreeLean_copy(., $flat, $n/local-name(.), (), $newVisited)
         
     case element() return
-        $n ! f:jtreeBare_copy(., $flat, $n/local-name(.), (), $newVisited)    
+        $n ! f:jtreeLean_copy(., $flat, $n/local-name(.), (), $newVisited)    
         
     default return $n        
 };   
@@ -605,7 +626,7 @@ declare function f:jtreePrune_copy(
 };        
 
 (:~
- : Helper function of function `jtreeBareRC`. Returns a processed
+ : Helper function of function `jtreeLeanRC`. Returns a processed
  : copy of the input element.
  
  : @param e an element to be preocessed
@@ -614,7 +635,7 @@ declare function f:jtreePrune_copy(
  : @return a processed copy of the input element
  
  :)
-declare function f:jtreeBare_copy(
+declare function f:jtreeLean_copy(
                             $e as element(), 
                             $flat as xs:boolean?,
                             $schemaContext as xs:string?,
@@ -625,8 +646,8 @@ declare function f:jtreeBare_copy(
         if ($elemName) then $elemName
         else node-name($e)
     let $content := (
-        $e/@* ! f:jtreeBareRC(., $flat, $schemaContext, $visited),
-        $e/node() ! f:jtreeBareRC(., $flat, $schemaContext, $visited))
+        $e/@* ! f:jtreeLeanRC(., $flat, $schemaContext, $visited),
+        $e/node() ! f:jtreeLeanRC(., $flat, $schemaContext, $visited))
     let $contentAtts := $content[self::attribute()]
     let $contentElems := $content except $contentAtts
     return
