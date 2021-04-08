@@ -43,18 +43,27 @@ declare function f:jtree($schema as element(),
                          $options as map(*)?)
         as item()* {
     let $ostage := $options?ostage
-    
+    let $allOf := $options?allOf    
     let $flat := $options?flat
     let $lean := $options?lean
+    
     let $tree01 := $schema ! f:jtree01RC(., $flat, 'schema', ())
     let $tree02 := $tree01 (: Switch off the shifting of property details into details :)
     let $tree03 := $tree02 ! f:jtreeRequiredRC(., $flat, 'schema', ())
     let $tree04 := $tree03 ! f:jtreePruneRC(., $flat, 'schema', ())
-    let $tree05 := $tree04 ! all:jtreeAllOf(., ())
+    
+    (: If option 'allOf', allOf groups are *not* resolved :)
+    let $tree05 := if ($allOf) then $tree04 
+                   else $tree04 ! all:jtreeAllOf(., ())
+                   
     let $tree06 := $tree05 ! f:jtreePropertyAttsRC(., $flat, 'schema', ())
+    
+    (: If option 'lean', the model is made compact, e.g. unwrapping 
+           `properties` and `schema` keywors :)
     let $tree07 := 
         if (not($lean)) then $tree06
         else $tree06 ! f:jtreeLeanRC(., $flat, 'schema', ())
+        
     return 
         if (empty($ostage)) then $tree07
         else

@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-04-08T19:54:11.294+02:00 
+ : @version 2021-04-08T20:23:58.595+02:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -106,6 +106,7 @@ declare variable $toolScheme :=
       <param name="flat" type="xs:boolean?" default="false"/>
       <param name="bare" type="xs:boolean?"/>
       <param name="lean" type="xs:boolean?"/>
+      <param name="allOf" type="xs:boolean?"/>
       <param name="pathFilter" type="nameFilter?"/>
       <param name="methodFilter" type="nameFilter?"/>
       <param name="roleFilter" type="nameFilter?"/>
@@ -121,6 +122,7 @@ declare variable $toolScheme :=
       <param name="flat" type="xs:boolean?" default="false"/>
       <param name="bare" type="xs:boolean?"/>
       <param name="lean" type="xs:boolean?"/>
+      <param name="allOf" type="xs:boolean?"/>
       <param name="nameFilter" type="nameFilter?"/>
       <param name="odir" type="xs:string?"/>
       <param name="addSuffix" type="xs:string?"/>

@@ -13,6 +13,7 @@
          <param name="flat" type="xs:boolean?" default="false"/>
          <param name="bare" type="xs:boolean?"/>         
          <param name="lean" type="xs:boolean?"/>
+         <param name="allOf" type="xs:boolean?"/>         
          <param name="pathFilter" type="nameFilter?"/>
          <param name="methodFilter" type="nameFilter?"/>
          <param name="roleFilter" type="nameFilter?"/>
@@ -27,7 +28,8 @@
          <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
          <param name="flat" type="xs:boolean?" default="false"/>
          <param name="bare" type="xs:boolean?"/>
-         <param name="lean" type="xs:boolean?"/>         
+         <param name="lean" type="xs:boolean?"/> 
+         <param name="allOf" type="xs:boolean?"/>         
          <param name="nameFilter" type="nameFilter?"/>
          <param name="odir" type="xs:string?"/>
          <param name="addSuffix" type="xs:string?"/>
@@ -81,6 +83,7 @@ declare function f:mtreeOP($request as element())
     let $schemaKeyStyle := tt:getParam($request, 'schemaKeyStyle')    
     let $bare := tt:getParam($request, 'bare')
     let $lean := tt:getParam($request, 'lean')
+    let $allOf := tt:getParam($request, 'allOf')
     let $odir := tt:getParam($request, 'odir')
     let $addSuffix := tt:getParam($request, 'addSuffix')
     let $addPrefix := tt:getParam($request, 'addPrefix')
@@ -96,6 +99,7 @@ declare function f:mtreeOP($request as element())
         $schemaKeyStyle ! map:entry('schemaKeyStyle', .),        
         $bare ! map:entry('bare', .), 
         $lean ! map:entry('lean', .),
+        $allOf ! map:entry('allOf', .),        
         $odir ! map:entry('odir', .),
         $addSuffix ! map:entry('addSuffix', .),
         $addPrefix ! map:entry('addPrefix', .),
@@ -121,6 +125,7 @@ declare function f:streeOP($request as element())
     let $flat := tt:getParam($request, 'flat')
     let $bare := tt:getParam($request, 'bare')    
     let $lean := tt:getParam($request, 'lean')
+    let $allOf := tt:getParam($request, 'allOf')
     let $odir := tt:getParam($request, 'odir')
     let $addSuffix := tt:getParam($request, 'addSuffix')
     let $addPrefix := tt:getParam($request, 'addPrefix')
@@ -132,6 +137,7 @@ declare function f:streeOP($request as element())
         $flat ! map:entry('flat', .),
         $bare ! map:entry('bare', .),        
         $lean ! map:entry('lean', .),
+        $allOf ! map:entry('allOf', .),
         $odir ! map:entry('odir', .),
         $addSuffix ! map:entry('addSuffix', .),
         $addPrefix ! map:entry('addPrefix', .),
