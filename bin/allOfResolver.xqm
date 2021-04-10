@@ -28,6 +28,9 @@ at "tt/_nameFilter.xqm",
 import module namespace jt="http://www.oaslab.org/ns/xquery-functions/jtree" 
 at "jtree.xqm";    
 
+import module namespace nav="http://www.oaslab.org/ns/xquery-functions/navigation" 
+at "navigation.xqm";    
+
 import module namespace util="http://www.oaslab.org/ns/xquery-functions/util" 
 at "oaslabUtil.xqm";    
 
@@ -93,12 +96,16 @@ declare function f:resolveAllOf($schema as element(),
     let $normalized1 := f:normalizeAllOf1($schema, $options)    
     let $normalized2 := f:normalizeAllOf2($normalized1, $options) 
     let $normalized3 := f:normalizeAllOf3($normalized2, $options)
-    let $subschemasMerged := f:mergeAllOfSubschemas($normalized3, $options)
+    let $normalized4 := f:normalizeAllOf4($normalized3, $options)
+    let $subschemasMerged := f:mergeAllOfSubschemas($normalized4, $options)
     let $constraintsMerged := f:mergeAllOfConstraints($subschemasMerged, $options)
     return 
-        if ($ostage eq 2) then $normalized2
+        if ($ostage eq 0) then $schema
+        else if ($ostage eq 1) then $normalized1    
+        else if ($ostage eq 2) then $normalized2
         else if ($ostage eq 3) then $normalized3
-        else if ($ostage eq 4) then $subschemasMerged
+        else if ($ostage eq 4) then $normalized4
+        else if ($ostage eq 5) then $subschemasMerged
         else $constraintsMerged
 };
 
@@ -111,9 +118,9 @@ declare function f:resolveAllOf($schema as element(),
  :)
 
 (:~
- : Edits any element containing a z:schema element along with non-schema siblings:
- : the element content is replaced with an 'allOf' keyword containing the following
- : subschemas:
+ : Edits any element (except allOf, oneOf, anyOf) containing a z:schema element 
+ : with siblings. The element content is replaced with an 'allOf' keyword containing 
+ : the following subschemas:
  : - any z:schema element among the child elements
  : - any sequence of non-schema elements wrapped in a z:schema element
  :
@@ -156,30 +163,57 @@ declare function f:normalizeAllOf3(
 };        
 
 (:~
+ : Replaces nested z:schema elements with innermost element.
+ :)
+declare function f:normalizeAllOf4(
+                   $mtree as element(),
+                   $options as map(*)?)
+        as element() {
+    f:normalizeAllOf4RC($mtree, $options)
+};        
+
+(:~
  : Recursive helper function of `f:normalizeAllOf1`.
  :) 
 declare function f:normalizeAllOf1RC($n as node(),
                                      $options as map(*)?)
         as node()* {
+    (: Set the base attribute in the root element :)        
+    let $baseAtt := 
+        $n[empty(parent::*/name(.))][not(@xml:base)]
+        /attribute xml:base {base-uri(.)}
+    let $baseAtt := ()   (: BaseX bug? never found a parent, always wrote att :)        
+    return
+    
     typeswitch($n)
     case document-node() return
         document {$n/node() ! f:normalizeAllOf1RC(., $options)}
         
     case element(z:oas) return 
         element {node-name($n)} {
-            attribute xml:base {$n/base-uri(.)}[not($n/parent::*)],
+            $baseAtt,
             $n/@* !  f:normalizeAllOf1RC(., $options),
             $n/node() ! f:normalizeAllOf1RC(., $options)        
         }
     
+    case element(js:allOf) | element(js:oneOf) | element(js:anyOf) return
+        $n/element {node-name()} {
+            @* !  f:normalizeAllOf1RC(., $options),
+            node() ! f:normalizeAllOf1RC(., $options)        
+        }
+    
     case element() return
-        if ($n/(z:schema and (* except z:schema))) then
+        (: Schema with siblings is wrapped in `allOf` :)
+        if ($n/z:schema[preceding-sibling::*, following-sibling::*])
+        then
             let $subschemas := f:schemasAndKeywordsToSchemas($n/*)
             return
                 element {node-name($n)} {
+                    $baseAtt,
                     <js:allOf>{$subschemas}</js:allOf>}
         else
             element {node-name($n)} {
+                $baseAtt,
                 $n/@* !  f:normalizeAllOf1RC(., $options),
                 $n/node() ! f:normalizeAllOf1RC(., $options)        
             }
@@ -225,7 +259,6 @@ declare function f:normalizeAllOf2RC($n as node(),
         
     case element(z:oas) return 
         element {node-name($n)} {
-            attribute xml:base {$n/base-uri(.)}[not($n/parent::*)],
             $n/@* !  f:normalizeAllOf2RC(., $options),
             $n/node() ! f:normalizeAllOf2RC(., $options)        
         }
@@ -256,7 +289,6 @@ declare function f:normalizeAllOf2RC($n as node(),
     case text() return
         if ($n/../* and $n/not(matches(., '\S'))) then () else $n
         
-    case attribute(xml:base) return ()        
     default return $n        
 };        
 
@@ -269,6 +301,17 @@ declare function f:normalizeAllOf3RC($n as node(),
     typeswitch($n)
     case document-node() return
         document {$n/node() ! f:normalizeAllOf3RC(., $options)}
+        
+    (: Replace nested schemas with innermost schema :)
+    (:
+    case element(z:schemaXXX) return
+        let $next := nav:innermostSiblingLessSchema($n)
+        return
+            $next/element {node-name(.)} {
+                @* !  f:normalizeAllOf3RC(., $options),
+                node() ! f:normalizeAllOf3RC(., $options)        
+        }
+    :)  
     case element(js:allOf) return
         let $children := $n/node() ! f:normalizeAllOf3RC(., $options)
         let $subschemasRaw :=
@@ -292,6 +335,33 @@ declare function f:normalizeAllOf3RC($n as node(),
         element {node-name($n)} {
             $n/@* !  f:normalizeAllOf3RC(., $options),
             $n/node() ! f:normalizeAllOf3RC(., $options)        
+        }
+      
+    case text() return
+        if ($n/../* and $n/not(matches(., '\S'))) then () else $n
+        
+    default return $n        
+};        
+
+(:~
+ : Recursive helper function of `f:normalizeAllOf4`.
+ :)
+declare function f:normalizeAllOf4RC($n as node(),
+                                     $options as map(*)?)
+        as node()* {
+    typeswitch($n)
+    case document-node() return
+        document {$n/node() ! f:normalizeAllOf4RC(., $options)}
+        
+    (: Replace nested schemas with innermost schema :)
+    case element() return
+        let $next := 
+            if (not($n/self::z:schema)) then $n
+            else nav:innermostSiblingLessSchema($n)    
+        return
+            $next/element {node-name(.)} {
+                @* !  f:normalizeAllOf4RC(., $options),
+                node() ! f:normalizeAllOf4RC(., $options)        
         }
       
     case text() return
@@ -358,11 +428,27 @@ declare function f:mergeSubschemaPairAllOf(
                               $schema1Content as element()*,
                               $schema2 as element())
         as element()* {
+    let $schemaAttNameMapping :=
+        map{'name': 'z:schemaName', 'recursiveContent': 'z:recursiveContent'}
+        
+    (: A function turning schema attributes in pseudo-keywords :)
+    let $fn_processSchemaAtts := function($schema) {
+        for $att in $schema/@*
+        let $elemName := $att/name() ! ($schemaAttNameMapping(.), 'z:schemaInfo-' || .)[1]
+        return element {$elemName} {string($att)}
+    }
 
-    if (not($schema1Content)) then $schema2/* ! f:mergeAllOfSubschemasRC(., ())
+    return
+    
+    if (not($schema1Content)) then (
+        $schema2/* ! f:mergeAllOfSubschemasRC(., ()),
+        $schema2 ! $fn_processSchemaAtts(.))            
     else
     
-    let $schema2Content := $schema2/* ! f:mergeAllOfSubschemasRC(., ())
+    let $schema2Content := (
+        $schema2/* ! f:mergeAllOfSubschemasRC(., ()),
+        $schema2 ! $fn_processSchemaAtts(.))
+        
     let $keywordNames1 := $schema1Content/local-name(.)        
     let $keywordNames2 := $schema2Content/local-name(.)
     
@@ -447,6 +533,8 @@ declare function f:mergeAllOfConstraintsRC($n as node(),
             case element(js:properties) return f:mergeAllOfConstraints_properties($n)
             case element(z:required) return f:mergeAllOfConstraints_required($n)            
             case element(z:schema) return f:mergeAllOfConstraints_schema($n)            
+            case element(z:schemaName) return f:mergeAllOfConstraints_schemaInfoName($n)
+            case element(z:recursiveContent) return f:mergeAllOfConstraints_schemaInfoRecursiveContent($n)
             case element(js:type) return f:mergeAllOfConstraints_type($n)            
             default return f:mergeAllOfConstraints_other($n, $options)
     case text() return
@@ -477,9 +565,13 @@ declare function f:mergeAllOfConstraints_copy(
 
 declare function f:mergeAllOfConstraints_description($description as element(js:description))
         as element()? {
-    element {node-name($description)} {        
+    let $descriptions := $description/z:all/z:constraint/z:value[string()] => distinct-values()       
+    return
+    
+    element {node-name($description)} {
+        if (count($descriptions) eq 1) then $descriptions else
         (
-        for $item at $pos in $description/z:all/z:constraint/z:value
+        for $item at $pos in $descriptions
         return '(' || $pos || ') ' || $item
         )
         => string-join('&#xA;')
@@ -593,6 +685,20 @@ declare function f:mergeAllOfConstraints_schema($schema as element())
         (: <z:schema>{$resolved}</z:schema> , '___SCHEMA: ') :)
 };
 
+declare function f:mergeAllOfConstraints_schemaInfoName($name as element(z:schemaName))
+        as element()? {
+    let $names := $name/z:all/z:constraint/z:value => distinct-values() => sort() => string-join(', ')
+    return
+        <z:schemaName>{$names}</z:schemaName>
+};
+
+declare function f:mergeAllOfConstraints_schemaInfoRecursiveContent($recursiveContent as element(z:recursiveContent))
+        as element()? {
+    let $values := $recursiveContent/z:all/z:constraint/z:value => distinct-values()
+    return
+        if ($values = 'yes') then <z:recursiveContent>yes</z:recursiveContent>
+};
+
 declare function f:mergeAllOfConstraints_type($type as element(js:type))
         as element()? {
             (: ___TO_DO___ Not yet considered: possibility to have type arrays to be ANDed :)
@@ -619,32 +725,36 @@ declare function f:mergeAllOfConstraintPair_properties(
     let $propertyNames2 := $constraint2Content/local-name(.)
     
     let $allPropertyNames := ($propertyNames1, $propertyNames2) => distinct-values()
-    
     let $properties := (
         for $property1 in $constraint1Content
         let $property2 := $constraint2Content[local-name(.) eq $property1/local-name(.)]
+        let $_DEBUG := $property1[name() eq 'valuesXXX'] ! trace(., 'PROPERTY1: ')
+        let $_DEBUG := $property2[name() eq 'valuesXXX'] ! trace(., 'PROPERTY2: ')
         return
             if (not($property2)) then $property1
             else
+                let $_DEBUG := $property1/name()[.  eq 'valuesXXX'] ! trace(., '_SHARED_PROP: ')            
                 let $allOf :=
                     let $schema1 :=            
                         if ($property1/js:allOf) then $property1/js:allOf/*
                         else
                             <z:schema>{
-                                $property1/* (: ! f:mergeAllOfConstraintsRC(., ()) :) 
+                                $property1/* ! f:mergeAllOfConstraintsRC(., ()) 
                             }</z:schema>
                     let $schema2 := 
                         <z:schema>{
-                            $property2/*
+                            $property2/* ! f:mergeAllOfConstraintsRC(., ())
                         }</z:schema>
                     return
                         element {node-name($property1)} {
                             <js:allOf>{$schema1, $schema2}</js:allOf>                    
                         }
                 let $allOfResolved := $allOf ! f:resolveAllOf($allOf, ())
+                let $_DEBUG := if (not($property1/local-name(.) eq 'valuesXXX')) then () else trace($allOf,         '___ALLOF:    ')
+                let $_DEBUG := if (not($property1/local-name(.) eq 'valuesXXX')) then () else trace($allOfResolved, '___RESOLVED: ')
                 
-                let $_DEBUG := if (not($property1/local-name(.) eq 'supplier')) then () else file:write('DEBUG_ALL_OF_SUPPLIER_ELEM1.xml', $allOf)
-                let $_DEBUG := if (not($property1/local-name(.) eq 'supplier')) then () else file:write('DEBUG_ALL_OF_SUPPLIER_ELEM2.xml', $allOfResolved)
+                let $_DEBUG := if (not($property1/local-name(.) eq 'valuesXXX')) then () else file:write('DEBUG_ALL_OF_VALUES_ELEM1.xml', $allOf)
+                let $_DEBUG := if (not($property1/local-name(.) eq 'valuesXXX')) then () else file:write('DEBUG_ALL_OF_VALUES_ELEM2.xml', $allOfResolved)
                 
                 return $allOfResolved
             ,

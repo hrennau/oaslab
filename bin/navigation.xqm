@@ -225,3 +225,18 @@ declare function f:selectMediaTypeObject($content as element(),
         error(QName((), 'NOT_YET_IMPLEMENTED'), 'The filter must be: "json"')
 };
 
+(:~
+ : Returns the innermost schema without siblings. Details:
+ : - If the input schema has no child schema without siblings, it is returned
+ : - Otherwise, the function is called recursively with the child schema.
+ :)
+declare function f:innermostSiblingLessSchema($schema as element(z:schema))
+        as element(z:schema) {
+    let $childSchema :=
+        $schema
+        /z:schema[empty((preceding-sibling::*, following-sibling::*))]
+    return
+        if ($childSchema) then f:innermostSiblingLessSchema($childSchema)
+        else $schema
+};        
+

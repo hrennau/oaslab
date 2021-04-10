@@ -246,7 +246,9 @@ declare function f:jtreePropertyAttsRC(
          | element(js:maxItems)
          | element(js:nullable)
          | element(z:added)
+         | element(z:recursiveContent)         
          | element(z:required)
+         | element(z:schemaName)
          return
         attribute {local-name($n)} {$n}
         
@@ -414,7 +416,49 @@ declare function f:jtreeLeanRC($n as node(),
          
     case element(js:enum) return
         attribute {local-name($n)} {$n/* => string-join(', ')}
+      
+    case element(js:items) return
+        (: Nested array ! :)
+        if ($n/js:items) then   (:  $n ! f:jtreeLean_copy(., $flat, 'items-schema', (), $newVisited) :)
+            let $childResults := $n/js:items ! f:jtreeLeanRC(., $flat, 'item-schema', $newVisited)
+            let $childResultsAtts := $childResults[self::attribute()]
+            let $childResultsChildren := $childResults except $childResultsAtts
+            let $childResultsAttsEdited :=
+                for $att in $childResultsAtts
+                let $name := concat('items.', $att/local-name(.))
+                return attribute {$name} {$att}
+            return (    
+                $childResultsAttsEdited, 
+                $childResultsChildren
+            )
+            
+        (: Not nested array :)
+        else
         
+        let $singleSchemaChild := $n/*:schema[empty((preceding-sibling::*, following-sibling::*))]
+        let $itemsAtts := (
+            for $att in $n/@*
+            let $attName := 'items.' || local-name($att)
+            return 
+                attribute {$attName} {$att},
+            for $att in $singleSchemaChild/@*
+            let $attName := 'itemsSchema.' || local-name($att)
+            return
+                attribute {$attName} {$att}
+        )                
+        let $continueWithChildrenOf := ($singleSchemaChild, $n)[1]
+        return (
+            let $content := 
+                $continueWithChildrenOf/node() 
+                ! f:jtreeLeanRC(., $flat, 'item-schema', $newVisited)
+            let $contentAtts := $content/self::attribute()
+            let $contentChildren := $content except $contentAtts
+            return (
+                $contentAtts,
+                $itemsAtts,
+                $contentChildren
+            )
+        )
     case element(js:properties) return
         $n/* ! f:jtreeLean_copy(., $flat, 'property-schema', (), $newVisited)
        
@@ -436,12 +480,33 @@ declare function f:jtreeLeanRC($n as node(),
     )
     
     case element(z:schema) return
+        if ($n/@name and $schemaContext = ('property-schema', 'items')) then
+        
+        let $schemaAtts :=
+            for $att in $n/@*
+            let $attName := 'schema.' || $att/local-name(.)
+            return attribute {$attName} {$att}
+        let $content :=
+            $n/ node() ! f:jtreeLeanRC(., $flat, local-name(.), $newVisited)
+        let $contentAtts := $content[self::attribute()]            
+        let $contentChildren := $content except $contentAtts
+        return (
+            $contentAtts, 
+            $schemaAtts,
+            $contentChildren
+        )
+        
+        else
+            $n ! f:jtreeLean_copy(., $flat, $n/local-name(.), (), $newVisited)
+    
+(:    
+    case element(z:schema) return
         if ($n/@name and $schemaContext = ('property-schema', 'items')) then (
             $n/@name ! attribute schemaName {.},
             $n/* ! f:jtreeLeanRC(., $flat, local-name(.), $newVisited)
         ) else
             $n ! f:jtreeLean_copy(., $flat, $n/local-name(.), (), $newVisited)
-        
+:)        
     case element() return
         $n ! f:jtreeLean_copy(., $flat, $n/local-name(.), (), $newVisited)    
         
