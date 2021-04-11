@@ -84,14 +84,15 @@ declare function f:jtreeAllOf($mtrees as element()+,
 };
 
 (:~
- : Transforms a JSON Schema schema or an OAS node containing
- : JSON Schemas so that all allOf groups are resolved to their
- : merged contents. The result does not contain any allOf groups.
+ : Transforms an mtree (JSON Schema model tree) or a document containing 
+ : mtrees so that all allOf groups are resolved to their merged contents. 
+ : The result does not contain any allOf groups.
  :)
 declare function f:resolveAllOf($schema as element(),
                                  $options as map(*)?)
         as element() {
     let $ostage := $options?ostage
+    return if ($ostage eq 100) then $schema else
     
     let $normalized1 := f:normalizeAllOf1($schema, $options)    
     let $normalized2 := f:normalizeAllOf2($normalized1, $options) 
@@ -99,13 +100,12 @@ declare function f:resolveAllOf($schema as element(),
     let $normalized4 := f:normalizeAllOf4($normalized3, $options)
     let $subschemasMerged := f:mergeAllOfSubschemas($normalized4, $options)
     let $constraintsMerged := f:mergeAllOfConstraints($subschemasMerged, $options)
-    return 
-        if ($ostage eq 0) then $schema
-        else if ($ostage eq 1) then $normalized1    
-        else if ($ostage eq 2) then $normalized2
-        else if ($ostage eq 3) then $normalized3
-        else if ($ostage eq 4) then $normalized4
-        else if ($ostage eq 5) then $subschemasMerged
+    return       
+        if ($ostage eq 101) then $normalized1    
+        else if ($ostage eq 102) then $normalized2
+        else if ($ostage eq 103) then $normalized3
+        else if ($ostage eq 104) then $normalized4
+        else if ($ostage eq 105) then $subschemasMerged (: 105 - without merging constraints :)
         else $constraintsMerged
 };
 

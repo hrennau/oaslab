@@ -1,0 +1,75 @@
+{
+  "openapi":"3.1",
+  "info":{
+    "title":"oaslab test input a0001",
+    "version":"1.0.0",
+    "description":"Used as input for testing oaslab operations",
+    "termsOfService":"http://developer.here.com/terms-conditions",
+    "contact":{
+      "name":"oaslab",
+      "url":"https://github.com/hrennau/oaslab"
+    },
+    "license":{
+      "name":"3 clause BSD License",
+      "url":"https://en.wikipedia.org/wiki/BSD_licenses#3-clause_license_(%22BSD_License_2.0%22,_%22Revised_BSD_License%22,_%22New_BSD_License%22,_or_%22Modified_BSD_License%22)"
+    }
+  },
+  "servers":[
+    {
+      "url":"https://example.com/oaslab/v1",
+      "description":"Bogus URL."
+    }
+  ],
+  "security":[
+    {
+      "bearerAuth":[
+      ]
+    },
+    {
+      "apiKey":[
+      ]
+    }
+  ],
+  "paths":{
+    "/test":{
+      "get":{
+        "operationId":"get",
+        "responses":{
+          "200":{
+            "description":"Test response",
+            "content":{
+              "application/json":{
+                "schema":{
+                  "$ref":"#/components/schemas/SimpleObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components":{
+    "schemas":{
+      "SimpleObject":{
+        "description":"Simple object with four properties.",
+        "type":"object",
+        "required": ["a", "c"],        
+        "properties": {
+            "a": {
+                "description": "Property a",
+                "type": "string"
+            },
+            "b": {
+                "description": "Property b",
+                "type": "integer"
+            },
+            "c": {
+                "description": "Property c",            
+                "type": "boolean"
+            }
+        }
+      }
+    }
+  }
+}

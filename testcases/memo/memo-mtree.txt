@@ -1,0 +1,15 @@
+###### Operation mtree (model tree).
+# ------------------------------------------------------------------------------------------------------
+# Transforms an OAS document into a dictionary of message trees (<z:msgs>),
+# as well as a tree of message references (<z:msgObjectTree>).
+# ------------------------------------------------------------------------------------------------------
+
+### Invoke operation mtree, full result. 
+#   Input file:  input/testcase.json
+#   Output file: output/testcase.mtree-full.xml
+oaslab "mt?oas=/tt/oaslab/testcases/input/*.json,odir=/tt/oaslab/testcases/output,adds=.mtree-full,~lean"
+
+### Invoke operation mtree, lean result. 
+#   Input file:  input/testcase.json
+#   Output file: output/testcase.mtree-lean.xml
+oaslab "mt?oas=/tt/oaslab/testcases/input/*.json,odir=/tt/oaslab/testcases/output,adds=.mtree-lean,lean"

@@ -53,8 +53,14 @@ declare function f:jtree($schema as element(),
     let $tree04 := $tree03 ! f:jtreePruneRC(., $flat, 'schema', ())
     
     (: If option 'allOf', allOf groups are *not* resolved :)
-    let $tree05 := if ($allOf) then $tree04 
-                   else $tree04 ! all:jtreeAllOf(., ())
+    let $tree05 := 
+        if ($allOf) then $tree04 
+        else $tree04 ! all:resolveAllOf(., $options)
+    
+    (: ostage values between 100 and 199 mean that some stage of the
+       resolving of allOf groups is requested :)
+    return if ($ostage ge 100 and $ostage lt 200) then $tree05 else
+    
     let $tree06 := $tree05 ! f:jtreePropertyAttsRC(., $flat, 'schema', ())
     
     (: If option 'lean', the model is made compact, e.g. unwrapping 
