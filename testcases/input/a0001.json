@@ -67,6 +67,13 @@
             "c": {
                 "description": "Property c",            
                 "type": "boolean"
+            },
+            "d": {
+                "description": "Property d",            
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
             }
         }
       }

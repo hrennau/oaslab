@@ -1,0 +1,32 @@
+<z:oas xmlns:z="http://www.oaslab.org/ns/structure" sourceOAS="C:\tt\oaslab\testcases\input\a0002.json" countMsgs="1" countMsgUses="1">
+  <z:msgs xmlns:js="http://www.oaslab.org/ns/json-schema" count="1">
+    <z:msg schemaName="opid:get-output">
+      <js:schema type="object">
+        <js:description>Simple object with four properties.</js:description>
+        <js:properties>
+          <a required="true" type="string">
+            <js:description>Property a</js:description>
+          </a>
+          <b type="integer">
+            <js:description>Property b</js:description>
+          </b>
+          <c required="true" type="boolean">
+            <js:description>Property c</js:description>
+          </c>
+          <d type="array">
+            <js:description>Property d</js:description>
+            <js:items type="string"/>
+          </d>
+        </js:properties>
+      </js:schema>
+    </z:msg>
+  </z:msgs>
+  <z:msgObjectTree sourceOAS="C:\tt\oaslab\testcases\input\a0002.json" countMsgs="1" countMsgUses="1">
+    <z:endpoint path="/test">
+      <z:operation method="get" operationId="get">
+        <z:msg role="output" mediaType="application/json" schemaKey="opid:get-output"/>
+      </z:operation>
+    </z:endpoint>
+    <z:endpoint path="components"/>
+  </z:msgObjectTree>
+</z:oas>

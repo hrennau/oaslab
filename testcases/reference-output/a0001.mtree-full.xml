@@ -14,6 +14,10 @@
             <c required="true" type="boolean">
               <js:description>Property c</js:description>
             </c>
+            <d type="array">
+              <js:description>Property d</js:description>
+              <js:items type="string"/>
+            </d>
           </js:properties>
         </z:schema>
       </js:schema>

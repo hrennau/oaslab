@@ -1,0 +1,21 @@
+<z:oas xmlns:z="http://www.oaslab.org/ns/structure" sourceOAS="C:\tt\oaslab\testcases\input\b0001.json" countMsgs="1" countMsgUses="1">
+  <z:msgs xmlns:js="http://www.oaslab.org/ns/json-schema" count="1">
+    <z:msg schemaName="name:SimpleAllOf">
+      <js:schema>
+        <z:schema name="SimpleAllOf" type="object">
+          <a type="string" required="true"/>
+          <b type="integer"/>
+          <c type="boolean" required="true"/>
+          <d type="array" items.type="string"/>
+        </z:schema>
+      </js:schema>
+    </z:msg>
+  </z:msgs>
+  <z:msgObjectTree sourceOAS="C:\tt\oaslab\testcases\input\b0001.json" countMsgs="1" countMsgUses="1">
+    <z:endpoint path="/test">
+      <z:operation method="get" operationId="get">
+        <z:msg role="output" mediaType="application/json" schemaKey="name:SimpleAllOf"/>
+      </z:operation>
+    </z:endpoint>
+  </z:msgObjectTree>
+</z:oas>
