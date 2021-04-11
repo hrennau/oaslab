@@ -270,19 +270,29 @@ declare function f:normalizeAllOf2RC($n as node(),
                 $n/node() ! f:normalizeAllOf2RC(., $options)        
             }
         else
-            let $additionalSchema :=
-                <z:schema source="created-during-normalization">{
-                    $n/js:allOf/(preceding-sibling::*, following-sibling::*) 
-                    ! f:normalizeAllOf2RC(., $options)
-                }</z:schema>
+            let $additionalSchema1 :=
+                let $siblings := $n/js:allOf/preceding-sibling::*
+                return
+                    if (empty($siblings)) then () else
+                    <z:schema source="created-during-normalization">{
+                        $siblings ! f:normalizeAllOf2RC(., $options)
+                    }</z:schema>
+            let $additionalSchema2 :=
+                let $siblings := $n/js:allOf/following-sibling::*
+                return
+                    if (empty($siblings)) then () else
+                    <z:schema source="created-during-normalization">{
+                        $siblings ! f:normalizeAllOf2RC(., $options)
+                    }</z:schema>
             let $allOfSubschemas :=
                 $n/js:allOf/* ! f:normalizeAllOf2RC(., $options)
             return
                 element {node-name($n)} {
                     $n/@* ! f:normalizeAllOf2RC(., $options),
                     <js:allOf>{
-                        $additionalSchema,
-                        $allOfSubschemas
+                        $additionalSchema1,
+                        $allOfSubschemas,
+                        $additionalSchema2
                     }</js:allOf>
                 }
                 
@@ -358,12 +368,11 @@ declare function f:normalizeAllOf4RC($n as node(),
         let $next := 
             if (not($n/self::z:schema)) then $n
             else nav:innermostSiblingLessSchema($n)    
-        return
-            $next/element {node-name(.)} {
+        return $next/element {node-name(.)} {
                 @* !  f:normalizeAllOf4RC(., $options),
                 node() ! f:normalizeAllOf4RC(., $options)        
-        }
-      
+            }
+            
     case text() return
         if ($n/../* and $n/not(matches(., '\S'))) then () else $n
         
@@ -406,6 +415,23 @@ declare function f:mergeAllOfSubschemasRC(
     typeswitch($n)
     case document-node() return
         document {$n/node() ! f:mergeAllOfSubschemasRC(., $options)}
+ 
+    (: 20210411 
+       If the schema has a name, remove schema name elements in the content :)
+
+    case element(z:schema) return
+        let $content := $n/(
+            $n/@* !  f:mergeAllOfSubschemasRC(., $options),
+            $n/node() ! f:mergeAllOfSubschemasRC(., $options)
+        )
+        let $schemaNameAtt := $content/self::attribute(name)
+        let $schemaNameElem := $content/self::z:schemaName
+        let $content := 
+            if ($schemaNameAtt and $schemaNameElem) then $content except $schemaNameElem
+            else $content
+        return
+            element {node-name($n)} {$content}
+ 
     case element(js:allOf) return
         let $content := fold-left($n/*, (), f:mergeSubschemaPairAllOf#2)
         return $content
@@ -733,17 +759,33 @@ declare function f:mergeAllOfConstraintPair_properties(
         return
             if (not($property2)) then $property1
             else
-                let $_DEBUG := $property1/name()[.  eq 'valuesXXX'] ! trace(., '_SHARED_PROP: ')            
+            (:
+                let $property1SchemaName := $property1/z:schema/@name
+                let $property2SchemaName := $property2/z:schema/@name
+                
+                let $_DEBUG := $property1[name() eq 'version'] ! trace($property1SchemaName, '___SHARED_PROP1_SCHEMA_NAME: ')
+                let $_DEBUG := $property1[name() eq 'version'] ! trace($property2SchemaName, '___SHARED_PROP2_SCHEMA_NAME: ')
+             :)
+                (:
+                let $_DEBUG := $property1/name()[.  eq 'version'] ! trace(., '_SHARED_PROP1_NAME: ')   
+                let $_DEBUG := $property1[name(.)  eq 'version'] ! trace(., '_SHARED_PROP1_ELEM: ')
+                let $_DEBUG := $property1/z:schema/@name ! trace(., '___SHARED_PROP1_SCHEMA_NAME: ')
+                let $_DEBUG := $property2/name()[.  eq 'version'] ! trace(., '_SHARED_PROP2_NAME: ')   
+                let $_DEBUG := $property2[name(.)  eq 'version'] ! trace(., '_SHARED_PROP2_ELEM: ')
+                let $_DEBUG := $property2/z:schema/@name ! trace(., '___SHARED_PROP2_SCHEMA_NAME: ')
+                :)
                 let $allOf :=
                     let $schema1 :=            
                         if ($property1/js:allOf) then $property1/js:allOf/*
                         else
                             <z:schema>{
                                 $property1/* ! f:mergeAllOfConstraintsRC(., ()) 
+                            (:    [not(self::z:schemaName[trace(., '_SNAME: ') ne $property1SchemaName])] :)
                             }</z:schema>
                     let $schema2 := 
                         <z:schema>{
                             $property2/* ! f:mergeAllOfConstraintsRC(., ())
+                            (:     [not(self::z:schemaName[trace(., '_SNAME: ') ne $property2SchemaName])] :)
                         }</z:schema>
                     return
                         element {node-name($property1)} {

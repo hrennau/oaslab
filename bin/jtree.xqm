@@ -55,7 +55,6 @@ declare function f:jtree($schema as element(),
     (: If option 'allOf', allOf groups are *not* resolved :)
     let $tree05 := if ($allOf) then $tree04 
                    else $tree04 ! all:jtreeAllOf(., ())
-                   
     let $tree06 := $tree05 ! f:jtreePropertyAttsRC(., $flat, 'schema', ())
     
     (: If option 'lean', the model is made compact, e.g. unwrapping 
@@ -245,7 +244,7 @@ declare function f:jtreePropertyAttsRC(
          | element(js:minItems)
          | element(js:maxItems)
          | element(js:nullable)
-         | element(z:added)
+         | element(z:propertyAdded)
          | element(z:recursiveContent)         
          | element(z:required)
          | element(z:schemaName)
@@ -312,7 +311,7 @@ declare function f:jtreeRequiredRC(
             return
                 element {$requiredProperty ! convert:encode-key(.)} {
                     <z:required>true</z:required>,
-                    <z:added>because-required</z:added>
+                    <z:propertyAdded>because-required</z:propertyAdded>
                 }
         }
         
@@ -326,7 +325,7 @@ declare function f:jtreeRequiredRC(
                     $requiredAdditionalPnames !
                     element {. ! convert:encode-key(.)} {
                         <z:required>true</z:required>,
-                        <z:added>because-required</z:added>
+                        <z:propertyAdded>because-required</z:propertyAdded>
                     }
                 }</js:properties>
     
@@ -411,8 +410,10 @@ declare function f:jtreeLeanRC($n as node(),
     
     case element(js:description) 
          | element(js:example)
-         | element(js:title)
+         | element(js:title)         
          return ()
+         
+    case element(z:schemaInfo-source) return ()         
          
     case element(js:enum) return
         attribute {local-name($n)} {$n/* => string-join(', ')}
@@ -510,6 +511,8 @@ declare function f:jtreeLeanRC($n as node(),
     case element() return
         $n ! f:jtreeLean_copy(., $flat, $n/local-name(.), (), $newVisited)    
         
+    case attribute(propertyAdded) return ()
+    
     default return $n        
 };   
 
@@ -626,6 +629,14 @@ declare function f:jtreePropertyAtts_copy(
         $e/node() ! f:jtreePropertyAttsRC(., $flat, $schemaContext, $visited))
     let $contentAtts := $content[self::attribute()]
     let $contentElems := $content except $contentAtts
+        
+    (: Temporary workaround :)
+    let $contentAtts :=
+        for $att in $contentAtts
+        group by $attName := $att/name()
+        return
+            attribute {$attName} {$att}
+       
     return
         element {$name} {
             $contentAtts,
@@ -656,7 +667,8 @@ declare function f:jtreeRequired_copy(
         else node-name($e)
     let $content := (
         $e/@* ! f:jtreeRequiredRC(., $flat, $schemaContext, $visited),
-        $e/node() ! f:jtreeRequiredRC(., $flat, $schemaContext, $visited))
+        $e/(node() except js:required) ! f:jtreeRequiredRC(., $flat, $schemaContext, $visited),
+        $e/js:required ! f:jtreeRequiredRC(., $flat, $schemaContext, $visited))
     let $contentAtts := $content[self::attribute()]
     let $contentElems := $content except $contentAtts
     return
