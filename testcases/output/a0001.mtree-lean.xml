@@ -6,6 +6,7 @@
           <a required="true" type="string"/>
           <b type="integer"/>
           <c required="true" type="boolean"/>
+          <d type="array" items.type="string"/>
         </z:schema>
       </js:schema>
     </z:msg>

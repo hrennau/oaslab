@@ -248,7 +248,9 @@ declare function f:schemasAndKeywordsToSchemas($fields as element()*)
 };
 
 (:~
- : Recursive helper function of `f:normalizeAllOf2`.
+ : Recursive helper function of `f:normalizeAllOf2`. Shifts
+ : siblings of `allOf` into an additional subschema of
+ : `allOf`.
  :) 
 declare function f:normalizeAllOf2RC($n as node(),
                                      $options as map(*)?)
@@ -269,7 +271,9 @@ declare function f:normalizeAllOf2RC($n as node(),
                 $n/@* !  f:normalizeAllOf2RC(., $options),
                 $n/node() ! f:normalizeAllOf2RC(., $options)        
             }
+        (: `allOf` with siblings :)
         else
+            (: Subschema for preceding siblings :)
             let $additionalSchema1 :=
                 let $siblings := $n/js:allOf/preceding-sibling::*
                 return
@@ -277,6 +281,7 @@ declare function f:normalizeAllOf2RC($n as node(),
                     <z:schema source="created-during-normalization">{
                         $siblings ! f:normalizeAllOf2RC(., $options)
                     }</z:schema>
+            (: Subschema for following siblings :)                    
             let $additionalSchema2 :=
                 let $siblings := $n/js:allOf/following-sibling::*
                 return
@@ -739,74 +744,6 @@ declare function f:mergeAllOfConstraints_type($type as element(js:type))
         else ()                
 };
 
-declare function f:mergeAllOfConstraintPair_properties(
-                                           $constraint1Content as element()*,
-                                           $constraint2 as element(z:constraint))
-        as element()* {
-    if (empty($constraint1Content)) then $constraint2/* ! f:mergeAllOfConstraints(., ()) 
-    else    
-    
-    let $constraint2Content := $constraint2/* ! f:mergeAllOfConstraintsRC(., ())
-    let $propertyNames1 := $constraint1Content/local-name(.)        
-    let $propertyNames2 := $constraint2Content/local-name(.)
-    
-    let $allPropertyNames := ($propertyNames1, $propertyNames2) => distinct-values()
-    let $properties := (
-        for $property1 in $constraint1Content
-        let $property2 := $constraint2Content[local-name(.) eq $property1/local-name(.)]
-        let $_DEBUG := $property1[name() eq 'valuesXXX'] ! trace(., 'PROPERTY1: ')
-        let $_DEBUG := $property2[name() eq 'valuesXXX'] ! trace(., 'PROPERTY2: ')
-        return
-            if (not($property2)) then $property1
-            else
-            (:
-                let $property1SchemaName := $property1/z:schema/@name
-                let $property2SchemaName := $property2/z:schema/@name
-                
-                let $_DEBUG := $property1[name() eq 'version'] ! trace($property1SchemaName, '___SHARED_PROP1_SCHEMA_NAME: ')
-                let $_DEBUG := $property1[name() eq 'version'] ! trace($property2SchemaName, '___SHARED_PROP2_SCHEMA_NAME: ')
-             :)
-                (:
-                let $_DEBUG := $property1/name()[.  eq 'version'] ! trace(., '_SHARED_PROP1_NAME: ')   
-                let $_DEBUG := $property1[name(.)  eq 'version'] ! trace(., '_SHARED_PROP1_ELEM: ')
-                let $_DEBUG := $property1/z:schema/@name ! trace(., '___SHARED_PROP1_SCHEMA_NAME: ')
-                let $_DEBUG := $property2/name()[.  eq 'version'] ! trace(., '_SHARED_PROP2_NAME: ')   
-                let $_DEBUG := $property2[name(.)  eq 'version'] ! trace(., '_SHARED_PROP2_ELEM: ')
-                let $_DEBUG := $property2/z:schema/@name ! trace(., '___SHARED_PROP2_SCHEMA_NAME: ')
-                :)
-                let $allOf :=
-                    let $schema1 :=            
-                        if ($property1/js:allOf) then $property1/js:allOf/*
-                        else
-                            <z:schema>{
-                                $property1/* ! f:mergeAllOfConstraintsRC(., ()) 
-                            (:    [not(self::z:schemaName[trace(., '_SNAME: ') ne $property1SchemaName])] :)
-                            }</z:schema>
-                    let $schema2 := 
-                        <z:schema>{
-                            $property2/* ! f:mergeAllOfConstraintsRC(., ())
-                            (:     [not(self::z:schemaName[trace(., '_SNAME: ') ne $property2SchemaName])] :)
-                        }</z:schema>
-                    return
-                        element {node-name($property1)} {
-                            <js:allOf>{$schema1, $schema2}</js:allOf>                    
-                        }
-                let $allOfResolved := $allOf ! f:resolveAllOf($allOf, ())
-                let $_DEBUG := if (not($property1/local-name(.) eq 'valuesXXX')) then () else trace($allOf,         '___ALLOF:    ')
-                let $_DEBUG := if (not($property1/local-name(.) eq 'valuesXXX')) then () else trace($allOfResolved, '___RESOLVED: ')
-                
-                let $_DEBUG := if (not($property1/local-name(.) eq 'valuesXXX')) then () else file:write('DEBUG_ALL_OF_VALUES_ELEM1.xml', $allOf)
-                let $_DEBUG := if (not($property1/local-name(.) eq 'valuesXXX')) then () else file:write('DEBUG_ALL_OF_VALUES_ELEM2.xml', $allOfResolved)
-                
-                return $allOfResolved
-            ,
-            $constraint2Content[not(local-name(.) = $propertyNames1)]
-        )
-    return (
-        $properties
-    )
-};        
-
 (:~
  : Attempts to merge the constraints of a `z:all` set of constraints.
  : Strategy: if all constraints are deep-equal, the `z:all` set is 
@@ -832,4 +769,70 @@ declare function f:mergeAllOfConstraints_other($other as element(), $options as 
     return
         if ($uniform) then element {node-name($other)} {$other/z:all/z:constraint[1]/node()}
         else f:mergeAllOfConstraints_copy($other, $options)
-};            
+};  
+
+(: 
+ : ===================================================================================
+ :
+ :     C o m b i n e    p r o p e r t i e s
+ :
+ : =================================================================================== 
+ :)
+
+(:~
+ : Combines a set of properties with another set of properties.
+ :
+ : @param constraint1Content a set of propwrties
+ : @param constraint2 another set of properties, wrapped in a <z:constraint> element
+ : @return the combined set of properties
+ :) 
+declare function f:mergeAllOfConstraintPair_properties(
+                                           $constraint1Content as element()*,
+                                           $constraint2 as element(z:constraint))
+        as element()* {
+    if (empty($constraint1Content)) then $constraint2/* ! f:mergeAllOfConstraints(., ()) 
+    else    
+    
+    let $constraint2Content := $constraint2/* ! f:mergeAllOfConstraintsRC(., ())
+    let $propertyNames1 := $constraint1Content/local-name(.)        
+    let $propertyNames2 := $constraint2Content/local-name(.)
+    
+    let $allPropertyNames := ($propertyNames1, $propertyNames2) => distinct-values()
+    let $properties := (
+        for $property1 in $constraint1Content
+        let $property2 := $constraint2Content[local-name(.) eq $property1/local-name(.)]
+        let $_DEBUG := $property1[name() eq 'valuesXXX'] ! trace(., 'PROPERTY1: ')
+        let $_DEBUG := $property2[name() eq 'valuesXXX'] ! trace(., 'PROPERTY2: ')
+        return
+            (: A property without a matching property from the second set is simply retained :)
+            if (not($property2)) then $property1 ! f:mergeAllOfConstraintsRC(., ())
+            
+            (: There is a matching property from the second set :)
+            else
+               let $allOf :=
+                    let $schema1 :=            
+                        if ($property1/js:allOf) then $property1/js:allOf/*
+                        else
+                            <z:schema>{
+                                $property1/* ! f:mergeAllOfConstraintsRC(., ()) 
+                            }</z:schema>
+                    let $schema2 := 
+                        <z:schema>{
+                            $property2/* ! f:mergeAllOfConstraintsRC(., ())
+                        }</z:schema>
+                    return
+                        element {node-name($property1)} {
+                            <js:allOf>{$schema1, $schema2}</js:allOf>                    
+                        }
+                let $allOfResolved := $allOf ! f:resolveAllOf($allOf, ())
+                return $allOfResolved
+            ,
+            
+            (: Properties occurring only in the second set :)
+            $constraint2Content[not(local-name(.) = $propertyNames1)]
+        )
+    return (
+        $properties
+    )
+};        
+
