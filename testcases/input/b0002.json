@@ -69,26 +69,44 @@
               },
               "b": {
                   "description": "Property b",              
-                  "type": "integer"              
+                  "type": "boolean"              
                },
               "c": {
                   "description": "Property c",   
                   "type": "integer"              
-               }
+               },
+              "d": {
+                  "description": "Property d",   
+                  "type": "array",
+                  "items": {
+                      "type": "string"
+                  }
+               }               
             }
       },
       "Object2": {
           "description":"Simple object schema.",      
           "properties": {
+                "b": {
+                    "description": "Property b",            
+                    "type": "boolean"
+                },
                 "c": {
                     "description": "Property c",            
-                    "type": "boolean"
+                    "type": "integer"
                 },
                 "d": {
                     "description": "Property d",            
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                },
+                "e": {
+                    "description": "Property e",                
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
                     }
                 }
           }

@@ -240,8 +240,7 @@ declare function f:jtreePropertyAttsRC(
     
     typeswitch($n)
     
-    case element(js:type) 
-         | element(js:format) 
+    case element(js:format) 
          | element(js:maxLength) 
          | element(js:minLength) 
          | element(js:pattern)
@@ -267,7 +266,11 @@ declare function f:jtreePropertyAttsRC(
             let $newSchemaContext := shut:getJsContext($n, $schemaContext)
             return f:jtreePropertyAtts_copy($n, $flat, $newSchemaContext, (), $newVisited)
         else $n/attribute {local-name(.)} {.}
-        
+    
+    case element(js:type) return
+        let $types := $n/(text(), _) => distinct-values() => sort() => string-join(', ')
+        return
+            attribute type {$types}
     case element() return
         let $newSchemaContext := shut:getJsContext($n, $schemaContext)
         return

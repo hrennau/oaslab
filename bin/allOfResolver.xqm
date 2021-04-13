@@ -734,14 +734,14 @@ declare function f:mergeAllOfConstraints_type($type as element(js:type))
         as element()? {
             (: ___TO_DO___ Not yet considered: possibility to have type arrays to be ANDed :)
     let $types1 := $type/z:all/z:constraint/z:value => distinct-values()
-    let $types2 := $type/z:all/z:constraint/_ => sort() => string-join('|')
+    let $types2 := $type/z:all/z:constraint/_ => distinct-values()
+    let $types := ($types1, $types2) => distinct-values() => sort()
+    let $value :=
+        if (count($types) eq 1) then $types
+        else $types ! <_>{.}</_>
+    let $type := if (count($value) eq 1) then 'string' else 'array'        
     return
-        if (exists($types1)) then <js:type>{$types1[1]}</js:type>
-        else if (exists($types2)) then 
-            <js:type type="array">{
-                ($types2/tokenize(., '\|') => distinct-values() => sort())
-                ! <_>.</_>}</js:type>
-        else ()                
+        <js:type type="{$type}">{$value}</js:type>
 };
 
 (:~
@@ -810,6 +810,9 @@ declare function f:mergeAllOfConstraintPair_properties(
             (: There is a matching property from the second set :)
             else
                let $allOf :=
+                    (: ____TO____DO____
+                       Check if this case distinction makes sense -
+                       I think it is superflous :)
                     let $schema1 :=            
                         if ($property1/js:allOf) then $property1/js:allOf/*
                         else
