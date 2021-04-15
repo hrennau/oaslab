@@ -429,15 +429,17 @@ declare function f:jtreeLeanRC($n as node(),
       
     case element(js:items) return
         (: Nested array ! :)
-        if ($n/js:items) then   (:  $n ! f:jtreeLean_copy(., $flat, 'items-schema', (), $newVisited) :)
-            let $childResults := $n/js:items ! f:jtreeLeanRC(., $flat, 'item-schema', $newVisited)
-            let $childResultsAtts := $childResults[self::attribute()]
+        if ($n/js:items or $n/z:schema/js:items) then
+            let $childResults := $n/(js:items, z:schema/js:items) ! f:jtreeLeanRC(., $flat, 'item-schema', $newVisited)            
+            let $childResultsAtts := $childResults[self::attribute()] 
             let $childResultsChildren := $childResults except $childResultsAtts
             let $childResultsAttsEdited :=
                 for $att in $childResultsAtts
                 let $name := concat('items.', $att/local-name(.))
                 return attribute {$name} {$att}
-            return (    
+            let $itemsSchemaNameAtt := $n/z:schema[js:items]/@name ! attribute itemsSchema.name {.}                
+            return ( 
+                $itemsSchemaNameAtt,
                 $childResultsAttsEdited, 
                 $childResultsChildren
             )
