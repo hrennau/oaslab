@@ -207,10 +207,11 @@ declare function f:normalizeAllOf1RC($n as node(),
         if ($n/z:schema[preceding-sibling::*, following-sibling::*])
         then
             let $subschemas := f:schemasAndKeywordsToSchemas($n/*)
+            let $subschemas2 := $subschemas ! f:normalizeAllOf1RC(., $options)
             return
                 element {node-name($n)} {
                     $baseAtt,
-                    <js:allOf>{$subschemas}</js:allOf>}
+                    <js:allOf>{$subschemas2}</js:allOf>}
         else
             element {node-name($n)} {
                 $baseAtt,

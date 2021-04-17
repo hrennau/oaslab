@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-04-08T20:23:58.595+02:00 
+ : @version 2021-04-17T20:28:23.692+02:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -133,7 +133,8 @@ declare variable $toolScheme :=
     <operation name="prune" type="item()?" func="pruneOP" mod="prune.xqm" namespace="http://www.oaslab.org/ns/xquery-functions/prune">
       <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
       <param name="pathFilter" type="nameFilter?"/>
-      <param name="operationFilter" type="nameFilter?"/>
+      <param name="methodFilter" type="nameFilter?"/>
+      <param name="operationIdFilter" type="nameFilter?"/>
       <param name="statusFilter" type="nameFilter?"/>
       <param name="odir" type="xs:string?"/>
       <param name="addSuffix" type="xs:string?"/>

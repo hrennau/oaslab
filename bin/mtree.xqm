@@ -191,22 +191,25 @@ declare function f:oasMsgTrees($oas as element(),
     let $bare := $options?bare
     let $optionsOasMsgObjectTree := map:put($options, 'withSchemaDict', not($bare))    
     let $optionsOasMsgObjectTree := map:put($options, 'withSchemaDict', true())
-    let $treeAndSchemaDict := f:oasMsgObjectTree($oas, $optionsOasMsgObjectTree)        
-    let $tree := 
-        <z:msgObjectTree>{
-            $treeAndSchemaDict[. instance of node()]/(@*, *)
-        }</z:msgObjectTree>
+    let $treeAndSchemaDict := f:oasMsgObjectTree($oas, $optionsOasMsgObjectTree)  
+    let $msgUses := $treeAndSchemaDict[. instance of node()]
+    let $att_sourceOAS := $msgUses/@sourceOAS
+    let $msgUsesTree := 
+        <z:msgUses>{
+            $msgUses/(@* except @sourceOAS, *)
+        }</z:msgUses>
     let $schemaDict := $treeAndSchemaDict[. instance of map(*)]
     let $schemaTrees := if ($bare) then () else
         for $key in map:keys($schemaDict)
         let $tree := jt:jtree($schemaDict($key), $options)
+        (:
         let $schemaName := $key[not(starts-with(., '<'))]
         let $schemaKey := $key[starts-with(., '<')]
+        :)
         order by lower-case($key)
         return
             <z:msg>{
-                $schemaName ! attribute schemaName {.},
-                $schemaKey ! attribute schemaKey {.},
+                $key ! attribute schemaKey {.},
                 $tree
             }</z:msg> 
     let $schemaTreeDict := if ($bare) then () else
@@ -215,10 +218,12 @@ declare function f:oasMsgTrees($oas as element(),
             $schemaTrees
         }</z:msgs>   
     let $report :=
-        <z:oas>{
-            $tree/@*,
-            $schemaTreeDict,
-            $tree
+        <z:oas
+            xmlns:js="http://www.oaslab.org/ns/json-schema">{
+            $att_sourceOAS,
+            $msgUsesTree/@*,
+            $msgUsesTree,            
+            $schemaTreeDict
         }</z:oas>
     return $report
 };
@@ -372,7 +377,7 @@ declare function f:getSchemaKeyMappings($oasTree as element(),
                         let $msgRole := $schemaKey1/ancestor::z:msg/@role
                         let $name := $schema/spat:msgNodeName(., $operationId, $uriPath, $httpMethod, $msgRole, true())
                                      ?msgNodeName
-                        let $_DEBUG := trace($name, '_SCHEMA__NAME: ')
+                        (: let $_DEBUG := trace($name, '_SCHEMA__NAME: ') :)
                         return map:entry($schemaKey1, $name)
 
 

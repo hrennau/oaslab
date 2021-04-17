@@ -11,7 +11,8 @@
       <operation name="prune" type="item()?" func="pruneOP">     
          <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
          <param name="pathFilter" type="nameFilter?"/>
-         <param name="operationFilter" type="nameFilter?"/>
+         <param name="methodFilter" type="nameFilter?"/>
+         <param name="operationIdFilter" type="nameFilter?"/>
          <param name="statusFilter" type="nameFilter?"/>
          <param name="odir" type="xs:string?"/>
          <param name="addSuffix" type="xs:string?"/>
@@ -45,8 +46,16 @@ declare function f:pruneOP($request as element())
         as item()? {
     let $oas := tt:getParam($request, 'oas')/*
     let $pathFilter := tt:getParam($request, 'pathFilter')
-    let $opFilter := tt:getParam($request, 'operationFilter')
+    let $methodFilter := tt:getParam($request, 'methodFilter')
+    let $opidFilter := tt:getParam($request, 'operationIdFilter')
     let $statusFilter := tt:getParam($request, 'statusFilter')
+    let $filters :=
+        map:merge((
+            $pathFilter ! map:entry('pathFilter', .),
+            $methodFilter ! map:entry('methodFilter', .),
+            $opidFilter ! map:entry('opidFilter', .),
+            $statusFilter ! map:entry('statusFilter', .)
+        ))
     
     let $odir := tt:getParam($request, 'odir')
     let $addSuffix := tt:getParam($request, 'addSuffix')
@@ -60,7 +69,7 @@ declare function f:pruneOP($request as element())
         $addPrefix ! map:entry('fnameReplacement', .)        
     ))
     return
-        f:pruneOAS($oas, $pathFilter, $opFilter, $statusFilter, $options)
+        f:pruneOAS($oas, $filters, $options)
 };
 
 (:~
@@ -73,23 +82,19 @@ declare function f:pruneOP($request as element())
  : returned as strings.
  :
  : @param oas one or several OpenAPI documents, as XML node trees
- : @param pathFilter a name filter for filtering Path Item Objects
- :   by their path
- : @param opFilter a name filter for filtering Operaions by their name
- :   (get, post, put, ...)
+ : @param filters filters defining the pruning (pathFilter, methodFilter,
+ :   operationIdFilter, statusFilter)
  : @return pruned copies, either returned as strings, or written
  :   into files
  :) 
 declare function f:pruneOAS($oas as element()+,
-                            $pathFilter as element(nameFilter)?,
-                            $opFilter as element(nameFilter)?,
-                            $statusFilter as element(nameFilter)?,
+                            $filters as map(*),
                             $options as map(xs:string, item()*)?)
         as item()? {
       
     let $odir := $options?odir
     for $doc in $oas
-    let $docEdited := f:pruneDocOAS($doc, $pathFilter, $opFilter, $statusFilter)
+    let $docEdited := f:pruneDocOAS($doc, $filters)
     let $jdoc := $docEdited ! util:jsonSerialize(.)
     return
         if ($odir) then $jdoc ! util:writeFile(., $doc, $options)
@@ -97,23 +102,29 @@ declare function f:pruneOAS($oas as element()+,
 };
 
 (:~
- : Creates a pruned copy of an OpenAPI document. If $pathFilter is not empty,
- : any Path Item Objects with a non-matching path are removed. If $opFilter is
- : not empty, any Operation Objects with a non-matching name are removed.
- :
+ : Creates a pruned copy of an OpenAPI document. If $filters?pathFilter 
+ : is not empty, any Path Item Objects with a non-matching path are removed. 
+ : If $filters?methodFilter is not empty, any Operation Objects with a 
+ : non-matching name are removed. If $filters?opidFilter is not empty,
+ : any operation which does not have a matching operation Id is removed.
+ : If $filters?statusFilter, any message not assigned to a matching HTTP
+ : status code is removed.
+ : 
  : @param oas an OpenAPI document
  : @param pathFilter a filter for Path Item Objects
- : @param opFilter a filter for operation Objects
+ : @param methodFilter a filter for Operation Objects, filtering by element name
+ : @param opidFilter a filter for Operation Objects, filtering by operation Id 
  : @return a pruned copy of the input document.
  :)
 declare function f:pruneDocOAS($oas as element(),
-                               $pathFilter as element(nameFilter)?,
-                               $opFilter as element(nameFilter)?,
-                               $statusFilter as element(nameFilter)?)
+                               $filters as map(*))
         as node()? {
+    let $methodFilter := $filters?methodFilter
+    let $opidFilter := $filters?opidFilter
+    
     let $opElems :=
-        if (empty($opFilter)) then () else nav:oasOperationObjects($oas)
-    let $prune1 := f:prunePathsAndOperationsRC($oas, $pathFilter, $opFilter, $statusFilter, $opElems)
+        if (empty(($methodFilter, $opidFilter))) then () else nav:oasOperationObjects($oas)
+    let $prune1 := f:prunePathsAndOperationsRC($oas, $filters, $opElems)
     let $msgObjects := nav:oasMsgObjects($prune1)
     let $_DEBUG := trace('PRUNE1 done') 
     let $requiredMsgObjects := 
@@ -131,15 +142,19 @@ declare function f:pruneDocOAS($oas as element(),
  :)
 declare function f:prunePathsAndOperationsRC(
                                 $n as node(),
-                                $pathFilter as element(nameFilter)?,
-                                $opFilter as element(nameFilter)?,
-                                $statusFilter as element(nameFilter)?,
+                                $filters as map(*),
                                 $opElems as element()*)
         as node()? {
+    let $pathFilter := $filters?pathFilter
+    let $methodFilter := $filters?methodFilter
+    let $opidFilter := $filters?opidFilter
+    let $statusFilter := $filters?statusFilter
+    return
+    
     typeswitch($n)
     case document-node() return 
         document {$n/node() ! 
-            f:prunePathsAndOperationsRC(., $pathFilter, $opFilter, $statusFilter, $opElems)}
+            f:prunePathsAndOperationsRC(., $filters, $opElems)}
     case element(paths) return
         if ($n/parent::json and not($n/../parent::*)) then
             $n/element {node-name(.)} {
@@ -148,14 +163,16 @@ declare function f:prunePathsAndOperationsRC(
                 let $jname := trace( $path/local-name(.) ! convert:decode-key(.) , '___JNAME: ')
                 where empty($pathFilter) or tt:matchesNameFilter($jname, $pathFilter)
                 let $_DEBUG := trace($path/name(), '_PATH_ACCEPTED: ')
-                return f:prunePathsAndOperations_copy($path, $pathFilter, $opFilter, $statusFilter, $opElems)
+                return 
+                    f:prunePathsAndOperations_copy($path, $filters, $opElems)[*]
             }        
-        else f:prunePathsAndOperations_copy($n, $pathFilter, $opFilter, $statusFilter, $opElems)
+        else f:prunePathsAndOperations_copy($n, $filters, $opElems)
     case element(get) | element(post) | element(put) | element(delete) |
          element(head) | element(options) | element(patch) | element(trace)
          return
-            if ($n intersect $opElems and not(tt:matchesNameFilter($n/local-name(.), $opFilter))) then ()
-            else f:prunePathsAndOperations_copy($n, $pathFilter, $opFilter, $statusFilter, $opElems)
+            if ($n intersect $opElems and not(tt:matchesNameFilter($n/local-name(.), $methodFilter))) then ()
+            else if ($n intersect $opElems and not(tt:matchesNameFilter($n/operationId, $opidFilter))) then ()
+            else f:prunePathsAndOperations_copy($n, $filters, $opElems)
          
     case element() return
         let $suppress := 
@@ -164,7 +181,7 @@ declare function f:prunePathsAndOperationsRC(
             and not($n/util:jname(.) ! tt:matchesNameFilter(., $statusFilter))
         return 
             if ($suppress) then trace((), concat('_SUPPRESS_', $n/util:jname(.), ': ')) else 
-                f:prunePathsAndOperations_copy($n, $pathFilter, $opFilter, $statusFilter, $opElems)
+                f:prunePathsAndOperations_copy($n, $filters, $opElems)
     default return $n    
 };        
 
@@ -174,14 +191,12 @@ declare function f:prunePathsAndOperationsRC(
  :)
 declare function f:prunePathsAndOperations_copy(
                                  $e as element(),
-                                 $pathFilter as element(nameFilter)?,
-                                 $opFilter as element(nameFilter)?,
-                                 $statusFilter as element(nameFilter)?,
+                                 $filters as map(*),
                                  $opElems as element()*)
         as element() {
     $e/element {node-name(.)} {
-        @* ! f:prunePathsAndOperationsRC(., $pathFilter, $opFilter, $statusFilter, $opElems),
-        node() ! f:prunePathsAndOperationsRC(., $pathFilter, $opFilter, $statusFilter, $opElems)
+        @* ! f:prunePathsAndOperationsRC(., $filters, $opElems),
+        node() ! f:prunePathsAndOperationsRC(., $filters, $opElems)
     }
 };
 
