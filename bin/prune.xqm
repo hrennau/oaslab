@@ -11,6 +11,7 @@
       <operation name="prune" type="item()?" func="pruneOP">     
          <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
          <param name="pathFilter" type="nameFilter?"/>
+         <param name="pathNrs" type="xs:integer*"/>
          <param name="methodFilter" type="nameFilter?"/>
          <param name="operationIdFilter" type="nameFilter?"/>
          <param name="statusFilter" type="nameFilter?"/>
@@ -49,12 +50,14 @@ declare function f:pruneOP($request as element())
     let $methodFilter := tt:getParam($request, 'methodFilter')
     let $opidFilter := tt:getParam($request, 'operationIdFilter')
     let $statusFilter := tt:getParam($request, 'statusFilter')
+    let $pathNrs := tt:getParam($request, 'pathNrs')
     let $filters :=
         map:merge((
             $pathFilter ! map:entry('pathFilter', .),
             $methodFilter ! map:entry('methodFilter', .),
             $opidFilter ! map:entry('opidFilter', .),
-            $statusFilter ! map:entry('statusFilter', .)
+            $statusFilter ! map:entry('statusFilter', .),
+            $pathNrs ! map:entry('pathNrs', .)
         ))
     
     let $odir := tt:getParam($request, 'odir')
@@ -128,7 +131,7 @@ declare function f:pruneDocOAS($oas as element(),
     let $msgObjects := nav:oasMsgObjects($prune1)
     let $_DEBUG := trace('PRUNE1 done') 
     let $requiredMsgObjects := 
-        let $req := trace($msgObjects/nav:requiredSchemas(.)/. , '_REQUIRED_MSG_OBJECTS: ')
+        let $req := $msgObjects/nav:requiredSchemas(.)/.
         return if ($req) then $req else <DUMMY/> (: in order to avoid an empty value :)
     let $_DEBUG := trace(count($requiredMsgObjects), '#REQ_MSG_OBJECTS: ')        
     let $_WRITE := file:write('DEBUG_schemas', <result>{$msgObjects}</result>)
@@ -149,6 +152,7 @@ declare function f:prunePathsAndOperationsRC(
     let $methodFilter := $filters?methodFilter
     let $opidFilter := $filters?opidFilter
     let $statusFilter := $filters?statusFilter
+    let $pathNrs := $filters?pathNrs
     return
     
     typeswitch($n)
@@ -159,9 +163,11 @@ declare function f:prunePathsAndOperationsRC(
         if ($n/parent::json and not($n/../parent::*)) then
             $n/element {node-name(.)} {
                 @*,
-                for $path in *
-                let $jname := trace( $path/local-name(.) ! convert:decode-key(.) , '___JNAME: ')
-                where empty($pathFilter) or tt:matchesNameFilter($jname, $pathFilter)
+                for $path at $pnr in *
+                let $jname := $path/local-name(.) ! convert:decode-key(.)
+                where (empty($pathFilter) or tt:matchesNameFilter($jname, $pathFilter))
+                      and
+                      (empty($pathNrs) or $pnr = $pathNrs)
                 let $_DEBUG := trace($path/name(), '_PATH_ACCEPTED: ')
                 return 
                     f:prunePathsAndOperations_copy($path, $filters, $opElems)[*]
@@ -227,8 +233,10 @@ declare function f:removeNamedSchemasRC($n as node(),
             not($n/self::schemas/parent::components/parent::json[not(parent::*)])) then 
             f:removeNamedSchemas_copy($n, $keepSchemas, $dropSchemas)
         else      
+            (:
             let $_DEBUG := trace('GOING TO PRUNE DEFINITIONS ...')
             let $_DEBUG := trace(count($keepSchemas), '___#KEEP_SCHEMA: ')
+            :)
             let $children := $n/*
             let $retain := $children
                 [not(. intersect $dropSchemas)]
