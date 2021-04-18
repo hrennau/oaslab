@@ -64,7 +64,7 @@ declare function f:jtree($schema as element(),
     let $tree06 := $tree05 ! f:jtreePropertyAttsRC(., $flat, 'schema', ())
     
     (: If option 'lean', the model is made compact, e.g. unwrapping 
-           `properties` and `schema` keywors :)
+           `properties` and `schema` keywords :)
     let $tree07 := 
         if (not($lean)) then $tree06
         else $tree06 ! f:jtreeLeanRC(., $flat, 'schema', ())
@@ -109,17 +109,33 @@ declare function f:jtree01RC($n as node(),
     
     (: Reference is expanded :)
     case element(_0024ref) return
-        let $typeName := $n ! replace(., '^.*/', '')
+        let $mode := 'new'    
+        let $typeName := $n ! ref:refValueKey(.) 
         return
             if ($flat) then <z:schema ref="{$typeName}"/>
             else
-                let $referenced := $n/foxf:resolveJsonRef(., ., 'single')
-                let $content := $referenced/node() 
-                    ! f:jtree01RC(., $flat, 'named-schema', $newVisited)
-                return 
-                    <z:schema name="{$typeName}">{
-                        util:attsElems($content)}</z:schema>
+                let $referenced := $n/foxf:resolveJsonRef(., ., 'single')            
+                let $content :=
+                
+                (: mode = new :)
+                if ($mode eq 'new') then                
+                    if ($referenced = $newVisited) then attribute recursiveContent {'yes'} 
+                    else
+                        let $rawContent := $referenced/node() 
+                            ! f:jtree01RC(., $flat, 'named-schema', $newVisited)
+                        let $recursiveContent := $rawContent/self::attribute(recursiveContent)
+                        return
+                            if ($recursiveContent) then $recursiveContent
+                            else util:attsElems($rawContent)
             
+                (: mode = old :)            
+                else 
+                    ($referenced/node() 
+                    ! f:jtree01RC(., $flat, 'named-schema', $newVisited)
+                    ) => util:attsElems()
+                return
+                    <z:schema name="{$typeName}">{$content}</z:schema>
+                
     (: Properties :)
     case element(properties) return
         <js:properties>{
@@ -615,8 +631,9 @@ declare function f:jtree01_copy($e as element(),
         else 'js:' || $e/local-name(.)
     return
         element {$name} {
-            $e/@* ! f:jtree01RC(., $flat, $schemaContext, $visited),
-            $e/node() ! f:jtree01RC(., $flat, $schemaContext, $visited)
+            util:attsElems((
+                $e/@* ! f:jtree01RC(., $flat, $schemaContext, $visited),
+                $e/node() ! f:jtree01RC(., $flat, $schemaContext, $visited)))                
         }
 };        
 

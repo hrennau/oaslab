@@ -25,6 +25,10 @@ import module namespace tt="http://www.ttools.org/xquery-functions"
 at "tt/_nameFilter.xqm",
    "tt/_request.xqm";    
 
+import module namespace foxf="http://www.foxpath.org/ns/fox-functions" 
+at "tt/_foxpath-fox-functions.xqm";    
+
+
 import module namespace jt="http://www.oaslab.org/ns/xquery-functions/jtree" 
 at "jtree.xqm";    
 
@@ -439,8 +443,14 @@ declare function f:mergeAllOfSubschemasRC(
             element {node-name($n)} {$content}
  
     case element(js:allOf) return
-        let $content := fold-left($n/*, (), f:mergeSubschemaPairAllOf#2)
-        return $content
+        let $content := fold-left($n/*, (), f:mergeSubschemaPairAllOf#2)        
+        let $recursiveContent := $content/self::attribute(recursiveContent)
+        let $_DEBUG :=
+            for $rc in $content/descendant-or-self::attribute(recursiveContent)
+            return trace($rc/foxf:namePath(., 'lname', ()), '_RECURSIVE_CONTENT: ') 
+        return 
+            if ($recursiveContent) then $recursiveContent
+            else $content
     case element() return
         element {node-name($n)} {
             $n/@* !  f:mergeAllOfSubschemasRC(., $options),

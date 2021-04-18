@@ -122,3 +122,23 @@ declare function f:refValueName($ref as xs:string)
         as xs:string {
     replace($ref, '.*/', '')            
 };        
+
+(:~
+ : Returns a key characterizing the reference target. The key is the
+ : name of the named schema or other components, followed by a relative
+ : path to the reference target, if the target is not the named
+ : component itself.
+ :
+ : Example: #/definitions/foo              =>  foo
+ : Example: #/defiitions/foo/bar           => foo/bar 
+ : Example: #/components/schemas/foo       => foo 
+ : Example: #/components/schemas/foo/bar   => foo/bar
+ : Example: #/components/responses/foo     => foo 
+ :
+ : @param ref a JSON reference
+ : @return a key identifying the target
+ :)
+declare function f:refValueKey($ref as xs:string)
+        as xs:string {
+    $ref ! replace(., '#/(definitions|components/.*?)/(.*)', '$2')         
+};        

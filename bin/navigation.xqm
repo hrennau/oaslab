@@ -97,6 +97,7 @@ declare function f:requiredSchemasRC($schemas as element()*,
     return
         let $refs := $head//_0024ref/string()
         let $referenced := $refs ! foxf:resolveJsonRef(., $head, 'single')
+                                 ! f:containingNamedSchema(.)
         let $newTargets := $referenced except $visited
         let $newVisited := ($visited, $newTargets)
         let $newTargetsRecursive := (
@@ -105,6 +106,20 @@ declare function f:requiredSchemasRC($schemas as element()*,
         return
             if ($tail) then f:requiredSchemasRC($tail, $newVisited)
             else $newVisited
+};
+
+(:~
+ : Returns for a given JSON Schema element the named schema containing it.
+ :
+ : @param jsElem a JSON Schema element
+ : @return the containing named schema
+ :)
+declare function f:containingNamedSchema($jsElem as element())
+        as element()? {
+    $jsElem/ancestor-or-self::*
+    [parent::definitions/parent::json[not(parent::*)],
+     parent::schemas/parent::components/parent::json[not(parent::*)]]
+    [1]
 };
 
 (:~
