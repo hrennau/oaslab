@@ -125,7 +125,7 @@ declare function f:jtree01RC($n as node(),
                             ! f:jtree01RC(., $flat, 'named-schema', $newVisited)
                         let $recursiveContent := $rawContent/self::attribute(recursiveContent)
                         return
-                            if ($recursiveContent) then $recursiveContent
+                            if ($recursiveContent) then $recursiveContent[1]
                             else util:attsElems($rawContent)
             
                 (: mode = old :)            

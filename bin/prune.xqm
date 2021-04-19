@@ -12,9 +12,12 @@
          <param name="oas" type="jsonFOX" fct_minDocCount="1"/>
          <param name="pathFilter" type="nameFilter?"/>
          <param name="pathNrs" type="xs:integer*"/>
+         <param name="minPathNr" type="xs:integer?"/>
+         <param name="maxPathNr" type="xs:integer?"/>
          <param name="methodFilter" type="nameFilter?"/>
          <param name="operationIdFilter" type="nameFilter?"/>
          <param name="statusFilter" type="nameFilter?"/>
+         <param name="noreq" type="xs:boolean?"/>
          <param name="odir" type="xs:string?"/>
          <param name="addSuffix" type="xs:string?"/>
          <param name="addPrefix" type="xs:string?"/>
@@ -50,14 +53,20 @@ declare function f:pruneOP($request as element())
     let $methodFilter := tt:getParam($request, 'methodFilter')
     let $opidFilter := tt:getParam($request, 'operationIdFilter')
     let $statusFilter := tt:getParam($request, 'statusFilter')
+    let $noreq := tt:getParam($request, 'noreq')
     let $pathNrs := tt:getParam($request, 'pathNrs')
+    let $minPathNr := tt:getParam($request, 'minPathNr')
+    let $maxPathNr := tt:getParam($request, 'maxPathNr')
     let $filters :=
         map:merge((
             $pathFilter ! map:entry('pathFilter', .),
             $methodFilter ! map:entry('methodFilter', .),
             $opidFilter ! map:entry('opidFilter', .),
             $statusFilter ! map:entry('statusFilter', .),
-            $pathNrs ! map:entry('pathNrs', .)
+            $noreq ! map:entry('noreq', .),
+            $pathNrs ! map:entry('pathNrs', .),
+            $minPathNr ! map:entry('minPathNr', .),
+            $maxPathNr ! map:entry('maxPathNr', .)
         ))
     
     let $odir := tt:getParam($request, 'odir')
@@ -86,7 +95,7 @@ declare function f:pruneOP($request as element())
  :
  : @param oas one or several OpenAPI documents, as XML node trees
  : @param filters filters defining the pruning (pathFilter, methodFilter,
- :   operationIdFilter, statusFilter)
+ :   operationIdFilter, statusFilter, noreq)
  : @return pruned copies, either returned as strings, or written
  :   into files
  :) 
@@ -152,7 +161,10 @@ declare function f:prunePathsAndOperationsRC(
     let $methodFilter := $filters?methodFilter
     let $opidFilter := $filters?opidFilter
     let $statusFilter := $filters?statusFilter
+    let $noreq := $filters?noreq
     let $pathNrs := $filters?pathNrs
+    let $minPathNr := $filters?minPathNr
+    let $maxPathNr := $filters?maxPathNr
     return
     
     typeswitch($n)
@@ -168,7 +180,11 @@ declare function f:prunePathsAndOperationsRC(
                 where (empty($pathFilter) or tt:matchesNameFilter($jname, $pathFilter))
                       and
                       (empty($pathNrs) or $pnr = $pathNrs)
-                let $_DEBUG := trace($path/name(), '_PATH_ACCEPTED: ')
+                      and
+                      (empty($minPathNr) or $pnr ge $minPathNr)
+                      and
+                      (empty($maxPathNr) or $pnr le $maxPathNr)
+                let $_DEBUG := trace($path/util:jname(.), concat('PATH#', $pnr, ' ACCEPTED: '))              
                 return 
                     f:prunePathsAndOperations_copy($path, $filters, $opElems)[*]
             }        
@@ -179,7 +195,15 @@ declare function f:prunePathsAndOperationsRC(
             if ($n intersect $opElems and not(tt:matchesNameFilter($n/local-name(.), $methodFilter))) then ()
             else if ($n intersect $opElems and not(tt:matchesNameFilter($n/operationId, $opidFilter))) then ()
             else f:prunePathsAndOperations_copy($n, $filters, $opElems)
-         
+
+    case element(requestBody) return
+        if ($noreq) then () else 
+            f:prunePathsAndOperations_copy($n, $filters, $opElems)
+
+    case element(_) return
+        if ($noreq and $n[in eq 'body'][parent::parameters]) then () else 
+            f:prunePathsAndOperations_copy($n, $filters, $opElems)
+
     case element() return
         let $suppress := 
             $n/parent::responses/parent::*/parent::*/parent::paths/parent::json

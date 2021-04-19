@@ -231,7 +231,8 @@ declare function f:selectMediaTypeObject($content as element(),
     if ($filter eq 'json') then
         let $set1 := (
             $content/*[convert:decode-key(name(.)) eq 'application/json'],
-            $content/*[convert:decode-key(name(.)) eq 'application/scim+json']
+            $content/*[convert:decode-key(name(.)) eq 'application/scim+json'],
+            $content/*[convert:decode-key(name(.)) eq '*/*']
         )
         let $set2 := $content/(* except $set1)
             [convert:decode-key(name(.)) ! matches(., '^application/.*json.*')]
