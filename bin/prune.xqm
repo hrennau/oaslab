@@ -18,6 +18,8 @@
          <param name="operationIdFilter" type="nameFilter?"/>
          <param name="statusFilter" type="nameFilter?"/>
          <param name="noreq" type="xs:boolean?"/>
+         <param name="nodesc" type="xs:boolean?"/>
+         <param name="nox" type="xs:boolean?"/>
          <param name="odir" type="xs:string?"/>
          <param name="addSuffix" type="xs:string?"/>
          <param name="addPrefix" type="xs:string?"/>
@@ -30,6 +32,9 @@ module namespace f="http://www.oaslab.org/ns/xquery-functions/prune";
 
 import module namespace tt="http://www.ttools.org/xquery-functions" 
 at "tt/_nameFilter.xqm";    
+
+import module namespace shut="http://www.oaslab.org/ns/xquery-functions/schema-util" 
+at "schemaUtil.xqm";    
 
 import module namespace util="http://www.oaslab.org/ns/xquery-functions/util" 
 at "oaslabUtil.xqm";    
@@ -54,6 +59,8 @@ declare function f:pruneOP($request as element())
     let $opidFilter := tt:getParam($request, 'operationIdFilter')
     let $statusFilter := tt:getParam($request, 'statusFilter')
     let $noreq := tt:getParam($request, 'noreq')
+    let $nodesc := tt:getParam($request, 'nodesc')
+    let $nox := tt:getParam($request, 'nox')
     let $pathNrs := tt:getParam($request, 'pathNrs')
     let $minPathNr := tt:getParam($request, 'minPathNr')
     let $maxPathNr := tt:getParam($request, 'maxPathNr')
@@ -64,6 +71,8 @@ declare function f:pruneOP($request as element())
             $opidFilter ! map:entry('opidFilter', .),
             $statusFilter ! map:entry('statusFilter', .),
             $noreq ! map:entry('noreq', .),
+            $nodesc ! map:entry('nodesc', .),
+            $nox ! map:entry('nox', .),
             $pathNrs ! map:entry('pathNrs', .),
             $minPathNr ! map:entry('minPathNr', .),
             $maxPathNr ! map:entry('maxPathNr', .)
@@ -133,29 +142,55 @@ declare function f:pruneDocOAS($oas as element(),
         as node()? {
     let $methodFilter := $filters?methodFilter
     let $opidFilter := $filters?opidFilter
+    let $nodesc := $filters?nodesc
+    let $nox := $filters?nox
     
+    (: Operation elems required if operations are filtered, as the element name
+       is not a reliable indicator that an element is an operation element :)
     let $opElems :=
         if (empty(($methodFilter, $opidFilter))) then () else nav:oasOperationObjects($oas)
-    let $prune1 := f:prunePathsAndOperationsRC($oas, $filters, $opElems)
+        
+    (: Remove message objects :)
+    let $prune1 := f:pruneMsgsRC($oas, $filters, $opElems)
+    
+    (: The set of retained message objects :)
     let $msgObjects := nav:oasMsgObjects($prune1)
-    let $_DEBUG := trace('PRUNE1 done') 
     let $requiredMsgObjects := 
         let $req := $msgObjects/nav:requiredSchemas(.)/.
         return if ($req) then $req else <DUMMY/> (: in order to avoid an empty value :)
-    let $_DEBUG := trace(count($requiredMsgObjects), '#REQ_MSG_OBJECTS: ')        
-    let $_WRITE := file:write('DEBUG_schemas', <result>{$msgObjects}</result>)
-    let $_WRITE := file:write('DEBUG_schemas2', <result>{$msgObjects, $requiredMsgObjects}</result>)
+    let $_DEBUG := trace(count($requiredMsgObjects), '#REQ_MSG_OBJECTS: ')
+    
+    (: Remove unnecessary schemas :)
     let $prune2 := f:removeNamedSchemas($prune1, $requiredMsgObjects, ())
-    return $prune2
+    
+    let $removeFieldsOas := 
+        map{
+            'names': if ($nodesc) then ('description', 'title') else (),
+            'patterns': if ($nox) then '^x-.*' else ()
+        }
+    let $removeFieldsJschema := 
+        map{
+            'names': if ($nodesc) then ('description', 'title') else (),
+            'patterns': if ($nox) then '^x-.*' else ()
+        }
+    let $prune3 :=
+        if (empty(($removeFieldsOas?names, $removeFieldsOas?patterns, 
+                   $removeFieldsJschema?names, $removeFieldsJschema?patterns)))
+        then $prune2
+        else
+            let $cfgRemoveFields := map{'oas': $removeFieldsOas, 
+                                        'jschema': $removeFieldsJschema}        
+            return f:removeFields($prune2, $cfgRemoveFields) 
+    return $prune3
 };   
 
 (:~
  : Recursive helper function of `f:pruneDocOAS`.
  :)
-declare function f:prunePathsAndOperationsRC(
-                                $n as node(),
-                                $filters as map(*),
-                                $opElems as element()*)
+declare function f:pruneMsgsRC(
+                               $n as node(),
+                               $filters as map(*),
+                               $opElems as element()*)
         as node()? {
     let $pathFilter := $filters?pathFilter
     let $methodFilter := $filters?methodFilter
@@ -169,8 +204,9 @@ declare function f:prunePathsAndOperationsRC(
     
     typeswitch($n)
     case document-node() return 
-        document {$n/node() ! 
-            f:prunePathsAndOperationsRC(., $filters, $opElems)}
+        document {$n/node() ! f:pruneMsgsRC(., $filters, $opElems)}
+            
+    (: Remove selected paths :)
     case element(paths) return
         if ($n/parent::json and not($n/../parent::*)) then
             $n/element {node-name(.)} {
@@ -186,24 +222,29 @@ declare function f:prunePathsAndOperationsRC(
                       (empty($maxPathNr) or $pnr le $maxPathNr)
                 let $_DEBUG := trace($path/util:jname(.), concat('PATH#', $pnr, ' ACCEPTED: '))              
                 return 
-                    f:prunePathsAndOperations_copy($path, $filters, $opElems)[*]
+                    f:pruneMsgs_copy($path, $filters, $opElems)[*]
             }        
-        else f:prunePathsAndOperations_copy($n, $filters, $opElems)
+        else f:pruneMsgs_copy($n, $filters, $opElems)
+        
+    (: Remove selected operations :)
     case element(get) | element(post) | element(put) | element(delete) |
          element(head) | element(options) | element(patch) | element(trace)
          return
             if ($n intersect $opElems and not(tt:matchesNameFilter($n/local-name(.), $methodFilter))) then ()
             else if ($n intersect $opElems and not(tt:matchesNameFilter($n/operationId, $opidFilter))) then ()
-            else f:prunePathsAndOperations_copy($n, $filters, $opElems)
+            else f:pruneMsgs_copy($n, $filters, $opElems)
 
+    (: Remove request bodies :)
     case element(requestBody) return
         if ($noreq) then () else 
-            f:prunePathsAndOperations_copy($n, $filters, $opElems)
+            f:pruneMsgs_copy($n, $filters, $opElems)
 
+    (: Remove request bodies represented by parameter :)
     case element(_) return
         if ($noreq and $n[in eq 'body'][parent::parameters]) then () else 
-            f:prunePathsAndOperations_copy($n, $filters, $opElems)
+            f:pruneMsgs_copy($n, $filters, $opElems)
 
+    (: Filter by HTTP Status Code :)
     case element() return
         let $suppress := 
             $n/parent::responses/parent::*/parent::*/parent::paths/parent::json
@@ -211,22 +252,23 @@ declare function f:prunePathsAndOperationsRC(
             and not($n/util:jname(.) ! tt:matchesNameFilter(., $statusFilter))
         return 
             if ($suppress) then trace((), concat('_SUPPRESS_', $n/util:jname(.), ': ')) else 
-                f:prunePathsAndOperations_copy($n, $filters, $opElems)
+                f:pruneMsgs_copy($n, $filters, $opElems)
+                
     default return $n    
 };        
 
 (:~
- : Helper function of `f:prunePathsAndOperations`: maps an input element to
+ : Helper function of `f:pruneMsgsRC`: maps an input element to
  : a recursively processed copy.
  :)
-declare function f:prunePathsAndOperations_copy(
+declare function f:pruneMsgs_copy(
                                  $e as element(),
                                  $filters as map(*),
                                  $opElems as element()*)
         as element() {
     $e/element {node-name(.)} {
-        @* ! f:prunePathsAndOperationsRC(., $filters, $opElems),
-        node() ! f:prunePathsAndOperationsRC(., $filters, $opElems)
+        @* ! f:pruneMsgsRC(., $filters, $opElems),
+        node() ! f:pruneMsgsRC(., $filters, $opElems)
     }
 };
 
@@ -288,4 +330,84 @@ declare function f:removeNamedSchemas_copy(
         node() ! f:removeNamedSchemasRC(., $keepSchemas, $dropSchemas)
     }
 };
+
+(:~
+ : Remove fields.
+ :)
+declare function f:removeFields($oas as element(),
+                                $cfgRemoveFields as map(*))
+        as node()? {
+    f:removeFieldsRC($oas, $cfgRemoveFields, (), false())
+};
+
+
+
+(:~
+ : Recursive helper function of `removeFields`.
+ :)
+declare function f:removeFieldsRC(
+                           $n as node(), 
+                           $cfgRemoveFields as map(*),
+                           $schemaContext as xs:string?,
+                           $withinJschema as xs:boolean?)
+        as node()* {
+    (: let $_DEBUG := trace($withinJschema, '_WITHIN_JSCHEMA: ') :)
+    let $nextSchemaContext := shut:getJsContext($n, $schemaContext)
+    return
+    
+    typeswitch($n)
+    
+    (: Properties :)
+    case element(properties) return
+        element {node-name($n)}{
+            $n/@*,
+            for $p in $n/*
+            let $pSchemaContext := $p ! shut:getJsContext(., $nextSchemaContext)
+            return f:removeFields_copy($p, $cfgRemoveFields, $pSchemaContext, $withinJschema)
+        }
+        
+    case element(schema) return
+        let $withinJschema := true()
+        return f:removeFields_copy($n, $cfgRemoveFields, $nextSchemaContext, $withinJschema)
+        
+    (: Other element :)
+    case element() return
+        let $name := $n/local-name(.)
+        let $fieldConfig :=
+            if ($schemaContext = ('xxx', 'yyy', 'zzz')) then () else
+            
+            if ($withinJschema) then $cfgRemoveFields?jschema
+            else $cfgRemoveFields?oas
+        let $names := $fieldConfig?names
+        let $patterns := $fieldConfig?patterns
+        return
+            if ($name = $names) then ()
+            else if (some $pattern in $patterns satisfies matches($name, $pattern)) then ()
+            else
+                let $withinJschema :=
+                    if ($withinJschema) then $withinJschema
+                    else $n/parent::*/nav:oasSchemaLibrary(.)
+                return
+                    f:removeFields_copy($n, $cfgRemoveFields, $nextSchemaContext, $withinJschema)
+      
+    default return $n                
+};   
+
+declare function f:removeFields_copy(
+                              $e as element(),
+                              $cfgRemoveFields as map(*),
+                              $schemaContext as xs:string?,
+                              $withinJschema as xs:boolean?)
+        as element() {
+    let $name := $e/node-name(.)
+    return
+        element {$name} {
+            util:attsElems((
+                $e/@* ! f:removeFieldsRC(., $cfgRemoveFields, $schemaContext, $withinJschema),
+                $e/node() ! f:removeFieldsRC(., $cfgRemoveFields, $schemaContext, $withinJschema)))                
+        }
+};        
+
+
+
 

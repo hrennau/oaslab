@@ -1,7 +1,7 @@
 (:
  : oaslab - 
  :
- : @version 2021-04-19T22:14:46.037+02:00 
+ : @version 2021-04-22T19:38:25.898+02:00 
  :)
 
 import module namespace tt="http://www.ttools.org/xquery-functions" at
@@ -140,6 +140,8 @@ declare variable $toolScheme :=
       <param name="operationIdFilter" type="nameFilter?"/>
       <param name="statusFilter" type="nameFilter?"/>
       <param name="noreq" type="xs:boolean?"/>
+      <param name="nodesc" type="xs:boolean?"/>
+      <param name="nox" type="xs:boolean?"/>
       <param name="odir" type="xs:string?"/>
       <param name="addSuffix" type="xs:string?"/>
       <param name="addPrefix" type="xs:string?"/>

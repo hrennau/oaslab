@@ -45,6 +45,20 @@ declare function f:oasOperationObjects($oasElem as element())
 };     
 
 (:~
+ : Returns true if a given element is an OAS schema library
+ : element.
+ :)
+declare function f:oasSchemaLibrary($oasElem as element())
+        as xs:boolean {
+    exists(        
+        $oasElem/(        
+            self::definitions,
+            self::schemas/parent::components)
+        /parent::json[not(parent::*)])
+              
+};
+
+(:~
  : Maps a Schema Object to the set of all Schema Objects
  : required to process the Schema Object, including the
  : original Schema Object.
@@ -58,39 +72,16 @@ declare function f:requiredSchemas($schemas as element()*)
     f:requiredSchemasRC($schemas, ())        
 };
 
-(:
+(:~
+ : Recursive helper function of `requiredSchemas`.
+ :
+ : @param schemas the schemas to be analyzed
+ : @param found the schemas already found
+ :)
 declare function f:requiredSchemasRC($schemas as element()*,
-                                     $visited as element()*)
+                                     $found as element()*)
         as element()* {
-    if (empty($schemas)) then () else
-    
-    let $head := head($schemas)
-    let $tail := tail($schemas)
-    return
-        if ($head intersect $visited) then
-            if ($tail) then f:requiredSchemasRC($tail, $visited)
-            else $visited
-        else
-            let $refs := trace($head//_0024ref/string() , '_ALL_REFS: ')
-            let $referenced := $refs ! foxf:resolveJsonRef(trace(., '_RESOLVE: '), $head, 'single')
-            let $_DEBUG := trace(count($referenced), '#REFERENCED: ')
-            let $newTargets := $referenced except $visited
-            let $_DEBUG := trace($newTargets/generate-id(), '_NEW_TARGET_IDS: ')
-            let $newVisited := $visited
-            let $newTargetsRecursive := (
-                $newTargets,
-                f:requiredSchemasRC($newTargets, $newVisited))
-            let $newVisited := $newVisited | $newTargetsRecursive
-            return
-                if ($tail) then f:requiredSchemasRC($tail, $newVisited)
-                else $newVisited
-};
-:)
-
-declare function f:requiredSchemasRC($schemas as element()*,
-                                     $visited as element()*)
-        as element()* {
-    if (empty($schemas)) then () else
+    if (empty($schemas)) then $found else
     
     let $head := head($schemas)
     let $tail := tail($schemas)
@@ -98,14 +89,12 @@ declare function f:requiredSchemasRC($schemas as element()*,
         let $refs := $head//_0024ref/string()
         let $referenced := $refs ! foxf:resolveJsonRef(., $head, 'single')
                                  ! f:containingNamedSchema(.)
-        let $newTargets := $referenced except $visited
-        let $newVisited := ($visited, $newTargets)
-        let $newTargetsRecursive := (
-            $newTargets, f:requiredSchemasRC($newTargets, $newVisited))
-        let $newVisited := $newVisited | $newTargetsRecursive
+        let $newTargets := $referenced except $found
+        let $newFoundHere := ($found, $newTargets)
+        let $newFound := f:requiredSchemasRC($newTargets, $newFoundHere)
         return
-            if ($tail) then f:requiredSchemasRC($tail, $newVisited)
-            else $newVisited
+            if ($tail) then f:requiredSchemasRC($tail, $newFound)
+            else $newFound
 };
 
 (:~
@@ -256,3 +245,31 @@ declare function f:innermostSiblingLessSchema($schema as element(z:schema))
         else $schema
 };        
 
+(:
+declare function f:requiredSchemasRC($schemas as element()*,
+                                     $visited as element()*)
+        as element()* {
+    if (empty($schemas)) then () else
+    
+    let $head := head($schemas)
+    let $tail := tail($schemas)
+    return
+        if ($head intersect $visited) then
+            if ($tail) then f:requiredSchemasRC($tail, $visited)
+            else $visited
+        else
+            let $refs := trace($head//_0024ref/string() , '_ALL_REFS: ')
+            let $referenced := $refs ! foxf:resolveJsonRef(trace(., '_RESOLVE: '), $head, 'single')
+            let $_DEBUG := trace(count($referenced), '#REFERENCED: ')
+            let $newTargets := $referenced except $visited
+            let $_DEBUG := trace($newTargets/generate-id(), '_NEW_TARGET_IDS: ')
+            let $newVisited := $visited
+            let $newTargetsRecursive := (
+                $newTargets,
+                f:requiredSchemasRC($newTargets, $newVisited))
+            let $newVisited := $newVisited | $newTargetsRecursive
+            return
+                if ($tail) then f:requiredSchemasRC($tail, $newVisited)
+                else $newVisited
+};
+:)

@@ -89,7 +89,7 @@ declare function f:isJsKeyword($jsContext as xs:string) as xs:boolean {
  : @param parentJsContext the schema context in which the parent node appears
  : @return the schema context established by the input node
  :)
-declare function f:getJsContext($node as node(), $parentJsContext as xs:string)
+declare function f:getJsContext($node as node(), $parentJsContext as xs:string?)
         as xs:string {
     if (not($node instance of element())) then $parentJsContext else
     
